@@ -1,0 +1,9 @@
+# Copy to your cloudflared config directory and replace the hostname.
+# The GPU host only needs an outbound tunnel; do not open port 8000 publicly.
+tunnel: fly-poker-live
+credentials-file: C:\\Users\\YOUR_USER\\.cloudflared\\fly-poker-live.json
+
+ingress:
+  - hostname: live.example.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

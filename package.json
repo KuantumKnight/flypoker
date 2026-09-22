@@ -1,0 +1,34 @@
+{
+  "name": "fly-poker",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "cloudflare:build": "opennextjs-cloudflare build",
+    "cloudflare:preview": "wrangler dev --config wrangler.jsonc",
+    "cloudflare:deploy": "opennextjs-cloudflare build && wrangler deploy --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.3.0",
+    "gsap": "^3.13.0",
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "three": "^0.179.0",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.135.0"
+  }
+}

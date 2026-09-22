@@ -1,0 +1,1186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fly Poker live protocol",
+  "schemaVersion": 1,
+  "$defs": {
+    "FlyProfile": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "style": {
+          "title": "Style",
+          "type": "string"
+        },
+        "accent": {
+          "title": "Accent",
+          "type": "string"
+        },
+        "chips": {
+          "title": "Chips",
+          "type": "integer"
+        },
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "alive": {
+          "default": true,
+          "title": "Alive",
+          "type": "boolean"
+        },
+        "hole_cards": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Hole Cards",
+          "type": "array"
+        },
+        "equity": {
+          "default": 0.0,
+          "title": "Equity",
+          "type": "number"
+        },
+        "activity": {
+          "default": 0.0,
+          "title": "Activity",
+          "type": "number"
+        },
+        "vpip": {
+          "default": 0.0,
+          "title": "Vpip",
+          "type": "number"
+        },
+        "pfr": {
+          "default": 0.0,
+          "title": "Pfr",
+          "type": "number"
+        },
+        "aggression": {
+          "default": 0.0,
+          "title": "Aggression",
+          "type": "number"
+        },
+        "tell": {
+          "title": "Tell",
+          "type": "string"
+        },
+        "status": {
+          "default": "watching",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "style",
+        "accent",
+        "chips",
+        "seat",
+        "tell"
+      ],
+      "title": "FlyProfile",
+      "type": "object"
+    },
+    "TableSnapshot": {
+      "$defs": {
+        "FlyProfile": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "style": {
+              "title": "Style",
+              "type": "string"
+            },
+            "accent": {
+              "title": "Accent",
+              "type": "string"
+            },
+            "chips": {
+              "title": "Chips",
+              "type": "integer"
+            },
+            "seat": {
+              "title": "Seat",
+              "type": "integer"
+            },
+            "alive": {
+              "default": true,
+              "title": "Alive",
+              "type": "boolean"
+            },
+            "hole_cards": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Hole Cards",
+              "type": "array"
+            },
+            "equity": {
+              "default": 0.0,
+              "title": "Equity",
+              "type": "number"
+            },
+            "activity": {
+              "default": 0.0,
+              "title": "Activity",
+              "type": "number"
+            },
+            "vpip": {
+              "default": 0.0,
+              "title": "Vpip",
+              "type": "number"
+            },
+            "pfr": {
+              "default": 0.0,
+              "title": "Pfr",
+              "type": "number"
+            },
+            "aggression": {
+              "default": 0.0,
+              "title": "Aggression",
+              "type": "number"
+            },
+            "tell": {
+              "title": "Tell",
+              "type": "string"
+            },
+            "status": {
+              "default": "watching",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "style",
+            "accent",
+            "chips",
+            "seat",
+            "tell"
+          ],
+          "title": "FlyProfile",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "mode": {
+          "default": "simulated",
+          "enum": [
+            "simulated",
+            "flybrain"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "tournament_id": {
+          "title": "Tournament Id",
+          "type": "string"
+        },
+        "hand_id": {
+          "title": "Hand Id",
+          "type": "string"
+        },
+        "deck_seed": {
+          "default": 0,
+          "title": "Deck Seed",
+          "type": "integer"
+        },
+        "hand_number": {
+          "title": "Hand Number",
+          "type": "integer"
+        },
+        "street": {
+          "title": "Street",
+          "type": "string"
+        },
+        "board": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Board",
+          "type": "array"
+        },
+        "pot": {
+          "default": 0,
+          "title": "Pot",
+          "type": "integer"
+        },
+        "current_actor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Actor"
+        },
+        "blind_level": {
+          "default": 0,
+          "title": "Blind Level",
+          "type": "integer"
+        },
+        "blinds": {
+          "default": "10 / 20",
+          "title": "Blinds",
+          "type": "string"
+        },
+        "players": {
+          "items": {
+            "$ref": "#/$defs/FlyProfile"
+          },
+          "title": "Players",
+          "type": "array"
+        },
+        "last_event": {
+          "default": "The table is warming up.",
+          "title": "Last Event",
+          "type": "string"
+        },
+        "sequence": {
+          "default": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tournament_id",
+        "hand_id",
+        "hand_number",
+        "street",
+        "players"
+      ],
+      "title": "TableSnapshot",
+      "type": "object"
+    },
+    "EventEnvelope": {
+      "$defs": {
+        "EventPayload": {
+          "additionalProperties": true,
+          "description": "Known live-event payload fields.\n\nThe protocol stays forward-compatible: producers may add event-specific\nkeys, but the fields below document and type every payload currently\nemitted by the engine and GPU worker.",
+          "properties": {
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "mode": {
+              "enum": [
+                "simulated",
+                "flybrain"
+              ],
+              "title": "Mode",
+              "type": "string"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            },
+            "tournamentId": {
+              "title": "Tournamentid",
+              "type": "string"
+            },
+            "handNumber": {
+              "title": "Handnumber",
+              "type": "integer"
+            },
+            "blinds": {
+              "title": "Blinds",
+              "type": "string"
+            },
+            "deckSeed": {
+              "title": "Deckseed",
+              "type": "integer"
+            },
+            "players": {
+              "items": {},
+              "title": "Players",
+              "type": "array"
+            },
+            "playerId": {
+              "title": "Playerid",
+              "type": "string"
+            },
+            "street": {
+              "title": "Street",
+              "type": "string"
+            },
+            "board": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Board",
+              "type": "array"
+            },
+            "action": {
+              "title": "Action",
+              "type": "string"
+            },
+            "amount": {
+              "title": "Amount",
+              "type": "integer"
+            },
+            "sizing": {
+              "title": "Sizing",
+              "type": "string"
+            },
+            "pot": {
+              "title": "Pot",
+              "type": "integer"
+            },
+            "stacks": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Stacks",
+              "type": "array"
+            },
+            "logits": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Logits",
+              "type": "object"
+            },
+            "features": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Features",
+              "type": "object"
+            },
+            "legalActions": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Legalactions",
+              "type": "array"
+            },
+            "winnerId": {
+              "title": "Winnerid",
+              "type": "string"
+            },
+            "winnerIds": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Winnerids",
+              "type": "array"
+            },
+            "payouts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Payouts",
+              "type": "object"
+            },
+            "payoffs": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Payoffs",
+              "type": "array"
+            },
+            "replaySlug": {
+              "title": "Replayslug",
+              "type": "string"
+            },
+            "slug": {
+              "title": "Slug",
+              "type": "string"
+            },
+            "seeds": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Seeds",
+              "type": "array"
+            },
+            "activity": {
+              "title": "Activity",
+              "type": "number"
+            },
+            "regions": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Regions",
+              "type": "object"
+            },
+            "sampledSpikes": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Sampledspikes",
+              "type": "array"
+            },
+            "sampledNeuronCount": {
+              "title": "Sampledneuroncount",
+              "type": "integer"
+            },
+            "stimulatedPopulations": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Stimulatedpopulations",
+              "type": "array"
+            }
+          },
+          "title": "EventPayload",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "schemaVersion": {
+          "default": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "tournamentId": {
+          "title": "Tournamentid",
+          "type": "string"
+        },
+        "handId": {
+          "title": "Handid",
+          "type": "string"
+        },
+        "sequence": {
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "serverTime": {
+          "title": "Servertime",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/EventPayload"
+        }
+      },
+      "required": [
+        "tournamentId",
+        "handId",
+        "sequence",
+        "type"
+      ],
+      "title": "EventEnvelope",
+      "type": "object"
+    },
+    "EventPayload": {
+      "additionalProperties": true,
+      "description": "Known live-event payload fields.\n\nThe protocol stays forward-compatible: producers may add event-specific\nkeys, but the fields below document and type every payload currently\nemitted by the engine and GPU worker.",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "simulated",
+            "flybrain"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "tournamentId": {
+          "title": "Tournamentid",
+          "type": "string"
+        },
+        "handNumber": {
+          "title": "Handnumber",
+          "type": "integer"
+        },
+        "blinds": {
+          "title": "Blinds",
+          "type": "string"
+        },
+        "deckSeed": {
+          "title": "Deckseed",
+          "type": "integer"
+        },
+        "players": {
+          "items": {},
+          "title": "Players",
+          "type": "array"
+        },
+        "playerId": {
+          "title": "Playerid",
+          "type": "string"
+        },
+        "street": {
+          "title": "Street",
+          "type": "string"
+        },
+        "board": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Board",
+          "type": "array"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "amount": {
+          "title": "Amount",
+          "type": "integer"
+        },
+        "sizing": {
+          "title": "Sizing",
+          "type": "string"
+        },
+        "pot": {
+          "title": "Pot",
+          "type": "integer"
+        },
+        "stacks": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Stacks",
+          "type": "array"
+        },
+        "logits": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Logits",
+          "type": "object"
+        },
+        "features": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Features",
+          "type": "object"
+        },
+        "legalActions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Legalactions",
+          "type": "array"
+        },
+        "winnerId": {
+          "title": "Winnerid",
+          "type": "string"
+        },
+        "winnerIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Winnerids",
+          "type": "array"
+        },
+        "payouts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Payouts",
+          "type": "object"
+        },
+        "payoffs": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Payoffs",
+          "type": "array"
+        },
+        "replaySlug": {
+          "title": "Replayslug",
+          "type": "string"
+        },
+        "slug": {
+          "title": "Slug",
+          "type": "string"
+        },
+        "seeds": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Seeds",
+          "type": "array"
+        },
+        "activity": {
+          "title": "Activity",
+          "type": "number"
+        },
+        "regions": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Regions",
+          "type": "object"
+        },
+        "sampledSpikes": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Sampledspikes",
+          "type": "array"
+        },
+        "sampledNeuronCount": {
+          "title": "Sampledneuroncount",
+          "type": "integer"
+        },
+        "stimulatedPopulations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stimulatedpopulations",
+          "type": "array"
+        }
+      },
+      "title": "EventPayload",
+      "type": "object"
+    },
+    "SnapshotMessage": {
+      "$defs": {
+        "FlyProfile": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "style": {
+              "title": "Style",
+              "type": "string"
+            },
+            "accent": {
+              "title": "Accent",
+              "type": "string"
+            },
+            "chips": {
+              "title": "Chips",
+              "type": "integer"
+            },
+            "seat": {
+              "title": "Seat",
+              "type": "integer"
+            },
+            "alive": {
+              "default": true,
+              "title": "Alive",
+              "type": "boolean"
+            },
+            "hole_cards": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Hole Cards",
+              "type": "array"
+            },
+            "equity": {
+              "default": 0.0,
+              "title": "Equity",
+              "type": "number"
+            },
+            "activity": {
+              "default": 0.0,
+              "title": "Activity",
+              "type": "number"
+            },
+            "vpip": {
+              "default": 0.0,
+              "title": "Vpip",
+              "type": "number"
+            },
+            "pfr": {
+              "default": 0.0,
+              "title": "Pfr",
+              "type": "number"
+            },
+            "aggression": {
+              "default": 0.0,
+              "title": "Aggression",
+              "type": "number"
+            },
+            "tell": {
+              "title": "Tell",
+              "type": "string"
+            },
+            "status": {
+              "default": "watching",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "style",
+            "accent",
+            "chips",
+            "seat",
+            "tell"
+          ],
+          "title": "FlyProfile",
+          "type": "object"
+        },
+        "TableSnapshot": {
+          "properties": {
+            "mode": {
+              "default": "simulated",
+              "enum": [
+                "simulated",
+                "flybrain"
+              ],
+              "title": "Mode",
+              "type": "string"
+            },
+            "tournament_id": {
+              "title": "Tournament Id",
+              "type": "string"
+            },
+            "hand_id": {
+              "title": "Hand Id",
+              "type": "string"
+            },
+            "deck_seed": {
+              "default": 0,
+              "title": "Deck Seed",
+              "type": "integer"
+            },
+            "hand_number": {
+              "title": "Hand Number",
+              "type": "integer"
+            },
+            "street": {
+              "title": "Street",
+              "type": "string"
+            },
+            "board": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Board",
+              "type": "array"
+            },
+            "pot": {
+              "default": 0,
+              "title": "Pot",
+              "type": "integer"
+            },
+            "current_actor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Current Actor"
+            },
+            "blind_level": {
+              "default": 0,
+              "title": "Blind Level",
+              "type": "integer"
+            },
+            "blinds": {
+              "default": "10 / 20",
+              "title": "Blinds",
+              "type": "string"
+            },
+            "players": {
+              "items": {
+                "$ref": "#/$defs/FlyProfile"
+              },
+              "title": "Players",
+              "type": "array"
+            },
+            "last_event": {
+              "default": "The table is warming up.",
+              "title": "Last Event",
+              "type": "string"
+            },
+            "sequence": {
+              "default": 0,
+              "title": "Sequence",
+              "type": "integer"
+            },
+            "updated_at": {
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tournament_id",
+            "hand_id",
+            "hand_number",
+            "street",
+            "players"
+          ],
+          "title": "TableSnapshot",
+          "type": "object"
+        }
+      },
+      "description": "First WebSocket frame: a complete visible state and its sequence.",
+      "properties": {
+        "kind": {
+          "const": "snapshot",
+          "default": "snapshot",
+          "title": "Kind",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/TableSnapshot"
+        },
+        "sequence": {
+          "title": "Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "snapshot",
+        "sequence"
+      ],
+      "title": "SnapshotMessage",
+      "type": "object"
+    },
+    "EventMessage": {
+      "$defs": {
+        "EventEnvelope": {
+          "properties": {
+            "schemaVersion": {
+              "default": 1,
+              "title": "Schemaversion",
+              "type": "integer"
+            },
+            "tournamentId": {
+              "title": "Tournamentid",
+              "type": "string"
+            },
+            "handId": {
+              "title": "Handid",
+              "type": "string"
+            },
+            "sequence": {
+              "title": "Sequence",
+              "type": "integer"
+            },
+            "serverTime": {
+              "title": "Servertime",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "payload": {
+              "$ref": "#/$defs/EventPayload"
+            }
+          },
+          "required": [
+            "tournamentId",
+            "handId",
+            "sequence",
+            "type"
+          ],
+          "title": "EventEnvelope",
+          "type": "object"
+        },
+        "EventPayload": {
+          "additionalProperties": true,
+          "description": "Known live-event payload fields.\n\nThe protocol stays forward-compatible: producers may add event-specific\nkeys, but the fields below document and type every payload currently\nemitted by the engine and GPU worker.",
+          "properties": {
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "mode": {
+              "enum": [
+                "simulated",
+                "flybrain"
+              ],
+              "title": "Mode",
+              "type": "string"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            },
+            "tournamentId": {
+              "title": "Tournamentid",
+              "type": "string"
+            },
+            "handNumber": {
+              "title": "Handnumber",
+              "type": "integer"
+            },
+            "blinds": {
+              "title": "Blinds",
+              "type": "string"
+            },
+            "deckSeed": {
+              "title": "Deckseed",
+              "type": "integer"
+            },
+            "players": {
+              "items": {},
+              "title": "Players",
+              "type": "array"
+            },
+            "playerId": {
+              "title": "Playerid",
+              "type": "string"
+            },
+            "street": {
+              "title": "Street",
+              "type": "string"
+            },
+            "board": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Board",
+              "type": "array"
+            },
+            "action": {
+              "title": "Action",
+              "type": "string"
+            },
+            "amount": {
+              "title": "Amount",
+              "type": "integer"
+            },
+            "sizing": {
+              "title": "Sizing",
+              "type": "string"
+            },
+            "pot": {
+              "title": "Pot",
+              "type": "integer"
+            },
+            "stacks": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Stacks",
+              "type": "array"
+            },
+            "logits": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Logits",
+              "type": "object"
+            },
+            "features": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Features",
+              "type": "object"
+            },
+            "legalActions": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Legalactions",
+              "type": "array"
+            },
+            "winnerId": {
+              "title": "Winnerid",
+              "type": "string"
+            },
+            "winnerIds": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Winnerids",
+              "type": "array"
+            },
+            "payouts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Payouts",
+              "type": "object"
+            },
+            "payoffs": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Payoffs",
+              "type": "array"
+            },
+            "replaySlug": {
+              "title": "Replayslug",
+              "type": "string"
+            },
+            "slug": {
+              "title": "Slug",
+              "type": "string"
+            },
+            "seeds": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Seeds",
+              "type": "array"
+            },
+            "activity": {
+              "title": "Activity",
+              "type": "number"
+            },
+            "regions": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "title": "Regions",
+              "type": "object"
+            },
+            "sampledSpikes": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Sampledspikes",
+              "type": "array"
+            },
+            "sampledNeuronCount": {
+              "title": "Sampledneuroncount",
+              "type": "integer"
+            },
+            "stimulatedPopulations": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Stimulatedpopulations",
+              "type": "array"
+            }
+          },
+          "title": "EventPayload",
+          "type": "object"
+        }
+      },
+      "description": "Ordered WebSocket event frame following the initial snapshot.",
+      "properties": {
+        "kind": {
+          "const": "event",
+          "default": "event",
+          "title": "Kind",
+          "type": "string"
+        },
+        "event": {
+          "$ref": "#/$defs/EventEnvelope"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "title": "EventMessage",
+      "type": "object"
+    },
+    "StatusResponse": {
+      "properties": {
+        "status": {
+          "enum": [
+            "live",
+            "starting",
+            "offline"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "simulated",
+            "flybrain"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "gpu": {
+          "title": "Gpu",
+          "type": "string"
+        },
+        "connected_spectators": {
+          "title": "Connected Spectators",
+          "type": "integer"
+        },
+        "step_latency_ms": {
+          "title": "Step Latency Ms",
+          "type": "number"
+        },
+        "current_hand": {
+          "title": "Current Hand",
+          "type": "integer"
+        },
+        "brain_runtime": {
+          "default": "simulated",
+          "enum": [
+            "simulated",
+            "available",
+            "unavailable"
+          ],
+          "title": "Brain Runtime",
+          "type": "string"
+        },
+        "runtime_note": {
+          "default": "development adapter",
+          "title": "Runtime Note",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "mode",
+        "gpu",
+        "connected_spectators",
+        "step_latency_ms",
+        "current_hand"
+      ],
+      "title": "StatusResponse",
+      "type": "object"
+    }
+  }
+}

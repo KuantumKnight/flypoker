@@ -1,0 +1,29 @@
+{
+  "artifact_version": "readout-v1",
+  "connectome_sha256": "0a2fadecf2a713330c106490489aa3be21e9fda56475596ff08e9da303ff10dd",
+  "encoder_schema": "poker-feature-detectors-v1",
+  "pca_version": "sklearn-pca-64",
+  "training_seed": 20260921,
+  "samples": 900,
+  "artifact_path": "artifacts\\readout-male-cns-gpu-pca64",
+  "action_readout": "action_readout.pkl",
+  "size_readout": "sizing_readout.pkl",
+  "action_classes": [
+    "check-call",
+    "fold",
+    "raise"
+  ],
+  "sizing_classes": [
+    "all-in",
+    "half-pot",
+    "pot",
+    "three-quarter-pot"
+  ],
+  "metrics": {
+    "action_macro_f1": 0.7304993035465551,
+    "sizing_macro_f1": 0.6486500133116674,
+    "legal_action_rate": 1.0
+  },
+  "mode": "flybrain-descending-trace",
+  "reservoir": "flybrain"
+}

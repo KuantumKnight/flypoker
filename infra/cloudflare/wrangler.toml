@@ -1,0 +1,13 @@
+name = "fly-poker-replays"
+main = "src/index.ts"
+compatibility_date = "2026-09-20"
+
+[vars]
+# Replace this with the actual Cloudflare Pages origin before production.
+PUBLIC_ORIGIN = "https://live.example.com"
+
+[[r2_buckets]]
+binding = "REPLAYS"
+bucket_name = "fly-poker-replays"
+
+# Set INGEST_TOKEN as an encrypted Worker secret before enabling POST /ingest.

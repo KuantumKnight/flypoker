@@ -1,0 +1,32 @@
+node_modules
+.wrangler
+.next
+.open-next
+out
+dist
+.vercel
+*.tsbuildinfo
+__pycache__
+*.py[cod]
+.venv
+.venv311
+.venv312
+fly-data/
+data/*.db
+data/*.json
+data/*.png
+.env
+.env.*
+!.env.example
+weights.part.*
+
+# Local browser/debug captures and generated inspection sessions. These may
+# contain profile state, cookies, and machine-specific data; they are not
+# portfolio assets.
+artifacts/brain-map-browser/
+artifacts/browser-*/
+artifacts/chrome-*/
+artifacts/*.png
+
+# Runtime journals stay local to the host that runs the live table.
+services/api/data/*.db

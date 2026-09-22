@@ -1,0 +1,85 @@
+{
+  "artifact_version": "readout-v1",
+  "connectome_sha256": "0a2fadecf2a713330c106490489aa3be21e9fda56475596ff08e9da303ff10dd",
+  "encoder_schema": "poker-feature-detectors-v2",
+  "pca_version": "sklearn-pca-64",
+  "training_seed": 20260921,
+  "samples": 900,
+  "artifact_path": "artifacts\\readout-male-cns-gpu",
+  "action_readout": "action_readout.pkl",
+  "size_readout": "sizing_readout.pkl",
+  "action_classes": [
+    "check-call",
+    "fold",
+    "raise"
+  ],
+  "sizing_classes": [
+    "all-in",
+    "half-pot",
+    "pot",
+    "three-quarter-pot"
+  ],
+  "metrics": {
+    "action_macro_f1": 0.7557101625465665,
+    "sizing_macro_f1": 0.5771029823601365,
+    "legal_action_rate": 1.0
+  },
+  "variants": {
+    "vesper": {
+      "action_macro_f1": 0.8228528528528528,
+      "sizing_macro_f1": 0.7611338856205023,
+      "vpip": 0.5655555555555556,
+      "pfr": 0.29333333333333333,
+      "aggression": 0.518664047151277,
+      "action_readout": "variants/vesper/action_readout.pkl",
+      "size_readout": "variants/vesper/sizing_readout.pkl"
+    },
+    "sugar": {
+      "action_macro_f1": 0.7795008912655971,
+      "sizing_macro_f1": 0.7611338856205023,
+      "vpip": 0.8522222222222222,
+      "pfr": 0.6355555555555555,
+      "aggression": 0.7457627118644068,
+      "action_readout": "variants/sugar/action_readout.pkl",
+      "size_readout": "variants/sugar/sizing_readout.pkl"
+    },
+    "knuckles": {
+      "action_macro_f1": 0.7176897370992096,
+      "sizing_macro_f1": 0.5534865431135225,
+      "vpip": 0.8688888888888889,
+      "pfr": 0.6322222222222222,
+      "aggression": 0.7276214833759591,
+      "action_readout": "variants/knuckles/action_readout.pkl",
+      "size_readout": "variants/knuckles/sizing_readout.pkl"
+    },
+    "velvet": {
+      "action_macro_f1": 0.8194304490268616,
+      "sizing_macro_f1": 0.7636554621848739,
+      "vpip": 0.6011111111111112,
+      "pfr": 0.06888888888888889,
+      "aggression": 0.11460258780036968,
+      "action_readout": "variants/velvet/action_readout.pkl",
+      "size_readout": "variants/velvet/sizing_readout.pkl"
+    },
+    "static": {
+      "action_macro_f1": 0.7965296152598218,
+      "sizing_macro_f1": 0.6085042238819431,
+      "vpip": 0.8966666666666666,
+      "pfr": 0.7511111111111111,
+      "aggression": 0.8376703841387856,
+      "action_readout": "variants/static/action_readout.pkl",
+      "size_readout": "variants/static/sizing_readout.pkl"
+    },
+    "hex": {
+      "action_macro_f1": 0.8653151867691814,
+      "sizing_macro_f1": 0.6927977909510057,
+      "vpip": 0.6466666666666666,
+      "pfr": 0.22666666666666666,
+      "aggression": 0.35051546391752575,
+      "action_readout": "variants/hex/action_readout.pkl",
+      "size_readout": "variants/hex/sizing_readout.pkl"
+    }
+  },
+  "mode": "flybrain-descending-trace",
+  "reservoir": "flybrain"
+}
