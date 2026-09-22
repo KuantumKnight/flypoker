@@ -12,6 +12,8 @@ artifacts/brain-map-browser
 artifacts/browser-*
 artifacts/chrome-*
 artifacts/readout-*
+artifacts/*.png
+*.tsbuildinfo
 services/api
 training
 scripts
