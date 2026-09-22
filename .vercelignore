@@ -8,6 +8,7 @@ node_modules
 data
 fly-data
 weights.part.*
+public/models/spyfly.glb
 artifacts/brain-map-browser
 artifacts/browser-*
 artifacts/chrome-*
