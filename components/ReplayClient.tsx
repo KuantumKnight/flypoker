@@ -58,8 +58,8 @@ export default function ReplayClient({ slug }: { slug: string }) {
   }, [playing, cursor, events.length]);
 
   return <section className="replay-player" aria-label="Replay player">
-    {posterBase && replay && <img className="replay-poster" src={`${posterBase}/replays/${encodeURIComponent(replay.slug)}.svg`} alt="Generated Fly Poker replay poster" />}
-    <div className="replay-scene"><ReplayScene players={replaySnapshot.players} currentActor={replaySnapshot.current_actor} lastEvent={current ? readableType(current.type) : undefined} street={replaySnapshot.street} board={replaySnapshot.board} pot={replaySnapshot.pot} reducedMotion /></div>
+    {posterBase && replay && <img className="replay-poster" src={`${posterBase}/replays/${encodeURIComponent(replay.slug)}?poster=1`} alt="Generated Fly Poker replay poster" />}
+    {replaySnapshot ? <div className="replay-scene"><ReplayScene players={replaySnapshot.players} currentActor={replaySnapshot.current_actor} lastEvent={current ? readableType(current.type) : undefined} street={replaySnapshot.street} board={replaySnapshot.board} pot={replaySnapshot.pot} reducedMotion /></div> : <div className="replay-scene replay-unavailable"><strong>Replay unavailable</strong><span>The requested event journal was not found.</span></div>}
     <div className="replay-player-head"><div><span className="panel-kicker">EVENT RECONSTRUCTION / {replay?.mode ?? "LOADING"}</span><strong>{current ? readableType(current.type) : error ?? "Loading event journal…"}</strong></div><span className="mono">{events.length ? `${cursor + 1} / ${events.length}` : "—"}</span></div>
     <div className="replay-progress"><i style={{ width: `${events.length ? ((cursor + 1) / events.length) * 100 : 0}%` }} /></div>
     <div className="replay-events">{visibleEvents.length ? visibleEvents.map((event) => <div className={`replay-event ${event.sequence === current?.sequence ? "current" : ""}`} key={`${event.handId}-${event.sequence}`}><span className="mono">{String(event.sequence).padStart(4, "0")}</span><strong>{readableType(event.type)}</strong><span>{event.payload.playerId ? String(event.payload.playerId) : event.payload.street ? String(event.payload.street) : "table"}</span></div>) : <div className="replay-empty">The live host has not uploaded this hand yet. Start the API to generate the first journal.</div>}</div>
@@ -67,9 +67,10 @@ export default function ReplayClient({ slug }: { slug: string }) {
   </section>;
 }
 
-function reconstructSnapshot(base: TableSnapshot | undefined, events: EventEnvelope[]): TableSnapshot {
+function reconstructSnapshot(base: TableSnapshot | undefined, events: EventEnvelope[]): TableSnapshot | null {
+  if (!base || events.length === 0) return null;
   const snapshot: TableSnapshot = {
-    ...(base ?? { mode: "simulated", tournament_id: "replay", hand_id: "replay", deck_seed: 0, hand_number: 0, street: "intermission", board: [], pot: 0, current_actor: null, blind_level: 0, blinds: "10 / 20", players: [], last_event: "Replay", sequence: 0, updated_at: new Date(0).toISOString() }),
+    ...base,
     // The API snapshot is the hand's final/current state.  Replays must not
     // use its mutable stacks/cards as their starting point; the event journal
     // is authoritative for the visible hand progression.

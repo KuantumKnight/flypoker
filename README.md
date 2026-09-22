@@ -3,9 +3,10 @@
 Six fruit-fly connectome avatars at a cinematic poker table.
 
 The repository ships a complete visual/API vertical slice plus a validated
-optional MaleCNS GPU host. The simulator remains the safe default; when the
-versioned data and readouts are present, a bounded worker runs six independent
-FlyBrain lanes through the same event protocol and SQLite journal.
+MaleCNS GPU host. Public runtime is fail-closed: a bounded worker runs six
+independent FlyBrain lanes only after the versioned data and readouts pass the
+readiness gate. Offline viewers see recorded replays, never fabricated table
+state.
 
 ## Run the API
 
@@ -35,7 +36,8 @@ npm run dev
 ```
 
 The WebGL scene ships real, license-tracked assets in `public/models/`: the
-CC-BY Spy Fly body plus the CC0 Poker Pack table, card, and chip meshes. The
+CC-BY Spy Fly body, the CC0 Poker Pack table/card/chip meshes, and a CC0
+Kenney chair mesh from OpenGameArt. The
 six avatars wrap that body with insect-only articulated forelegs that reach
 for cards and chips on action beats. Set `NEXT_PUBLIC_FLY_GLTF_URL` to replace the bundled fly with a
 production GLB; if the browser has no WebGL support (or the probe fails), the
@@ -44,8 +46,8 @@ deterministic CSS table remains available. Set
 devices. See `public/models/CREDITS.md` and `ATTRIBUTIONS.md` before
 redistributing the build.
 
-The app falls back to a seeded local table when the API is unavailable. The
-production adapter boundary is in `services/api/flypoker/brain_adapter.py`;
+The app shows an explicit asleep/offline state when the API is unavailable and
+can load the latest recorded replay. The production adapter boundary is in `services/api/flypoker/brain_adapter.py`;
 install `services/api/requirements-gpu.txt` and provide the checksum-verified
 MaleCNS files plus a versioned readout manifest under `artifacts/` before
 switching the runtime from `simulated` to `flybrain`.
@@ -103,8 +105,7 @@ $env:FLY_BRAIN_SEED = "20260921"
 .venv312\Scripts\python.exe -m uvicorn flypoker.main:app --app-dir services/api --port 8000
 ```
 
-The browser and API still default to the simulator when these variables or
-artifacts are absent.
+The browser and API fail closed when these variables or artifacts are absent.
 
 For a read-only launch gate on the Windows host, run
 `scripts/launch-preflight.py --production`. It checks the CUDA tools,
@@ -115,16 +116,22 @@ replay Worker wiring without printing any secret values.
 
 The public portfolio UI is a normal Next.js deployment on Vercel. It does not
 need the RTX 5070 to stay on: when the laptop API is unavailable, the page
-falls back to its seeded showcase table and can read the latest replay from
+shows the asleep state and can read the latest recorded replay from
 `NEXT_PUBLIC_REPLAY_API_URL`.
 
+Replay storage uses a private Vercel Blob store named `fly-poker-replays`.
+The Hobby plan is enough for compact replay journals. The Vercel API routes
+`/api/replays/latest`, `/api/replays/{slug}`, and `/api/replays/ingest` handle
+readback and authenticated uploads; Cloudflare R2 is optional and is not
+required for this deployment.
+
 In the Vercel project, add these client-safe environment variables when the
-live host and replay Worker are ready:
+live host is ready:
 
 ```text
 NEXT_PUBLIC_API_URL=https://live.example.com
 NEXT_PUBLIC_LIVE_WS_URL=wss://live.example.com/v1/live/ws
-NEXT_PUBLIC_REPLAY_API_URL=https://replays.example.com
+NEXT_PUBLIC_REPLAY_API_URL=https://flypoker.vercel.app/api
 ```
 
 Deploy from the repository root with `vercel --prod`, or connect the GitHub
@@ -132,23 +139,21 @@ repository in the Vercel dashboard for automatic deployments. The short free
 address is intended to be `flypoker.vercel.app` if that project name is
 available.
 
-## Cloudflare replay deployment and laptop tunnel
+## Optional Cloudflare laptop tunnel
 
-The replay ingest Worker lives under `infra/cloudflare`. The optional replay
-fallback uses the checked-in `wrangler.jsonc` configuration:
+Cloudflare Tunnel is only used to expose the occasional live FastAPI host. It
+does not need R2 or a public port on the laptop:
 
 ```powershell
 $env:NEXT_PUBLIC_API_URL = "https://live.example.com"
 $env:NEXT_PUBLIC_LIVE_WS_URL = "wss://live.example.com/v1/live/ws"
-$env:NEXT_PUBLIC_REPLAY_API_URL = "https://replays.example.com"
-npm run cloudflare:build
-npx wrangler deploy --config wrangler.jsonc --dry-run
+$env:NEXT_PUBLIC_REPLAY_API_URL = "https://flypoker.vercel.app/api"
 ```
 
-Create the `fly-poker-live-ui-opennext-cache` R2 bucket and replace the
-placeholder Worker name/domain before the credentialed deploy. OpenNext warns
-on Windows; use WSL for the production build if the host reports a filesystem
-compatibility issue.
+Copy `infra/cloudflared/config.example.yml` to `config.yml`, replace the live
+hostname, then run `cloudflared tunnel run --config config.yml`. The Windows
+installer also reads the linked Vercel Blob token from `.env.local` so replay
+uploads do not require a second secret.
 
 ## Attribution and limits
 

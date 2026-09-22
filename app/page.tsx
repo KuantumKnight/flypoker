@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Accessibility, BrainCircuit, Camera, Eye, Info, Maximize2, Radio, Sparkles, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
 import { useFlyPokerStore } from "@/lib/store";
-import { FALLBACK_SNAPSHOT, type FlyPlayer, type LiveMessage, type NeuralTelemetry } from "@/lib/types";
+import type { FlyPlayer, LiveMessage, NeuralTelemetry, TableSnapshot } from "@/lib/types";
 
 const CasinoScene = dynamic(() => import("@/components/CasinoScene"), { ssr: false, loading: () => <div className="scene-loading">Lighting the felt…</div> });
 
@@ -30,7 +30,7 @@ export default function Home() {
   const events = useFlyPokerStore((state) => state.events);
   const decisions = useFlyPokerStore((state) => state.decisions);
   const telemetry = useFlyPokerStore((state) => state.telemetry);
-  const selectedFly = useMemo(() => snapshot.players.find((player) => player.id === selectedFlyId) ?? snapshot.players[0], [snapshot.players, selectedFlyId]);
+  const selectedFly = useMemo(() => snapshot?.players.find((player) => player.id === selectedFlyId) ?? snapshot?.players[0], [snapshot, selectedFlyId]);
 
   useTableAudio(events.length ? events[events.length - 1]?.type : undefined, muted);
 
@@ -44,17 +44,26 @@ export default function Home() {
 
   useEffect(() => {
     const loadLatestReplay = () => {
-      const replayApi = process.env.NEXT_PUBLIC_REPLAY_API_URL;
-      if (!replayApi) return;
-      fetch(`${replayApi.replace(/\/$/, "")}/replays/latest`)
-        .then((response) => response.ok ? response.json() : null)
-        .then((data) => {
-          if (data?.snapshot) {
-            setSnapshot(data.snapshot as typeof FALLBACK_SNAPSHOT);
-            setOfflineReplay(true);
-          }
-        })
-        .catch(() => undefined);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+      const replayApi = process.env.NEXT_PUBLIC_REPLAY_API_URL?.replace(/\/$/, "");
+      const candidates = [
+        apiBase ? `${apiBase}/v1/replays/latest` : "",
+        replayApi ? `${replayApi}/replays/latest` : "",
+      ].filter(Boolean);
+      void (async () => {
+        for (const candidate of candidates) {
+          try {
+            const response = await fetch(candidate);
+            if (!response.ok) continue;
+            const data = await response.json() as { snapshot?: TableSnapshot; events?: unknown[] };
+            if (data.snapshot && Array.isArray(data.events) && data.events.length > 0) {
+              setSnapshot(data.snapshot);
+              setOfflineReplay(true);
+              return;
+            }
+          } catch { /* try the next recorded replay source */ }
+        }
+      })();
     };
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (apiUrl) {
@@ -63,7 +72,7 @@ export default function Home() {
         fetch(`${apiBase}/v1/live/snapshot`).then((response) => response.ok ? response.json() : null),
         fetch(`${apiBase}/v1/status`).then((response) => response.ok ? response.json() : null),
       ])
-        .then(([data, status]) => status?.status === "offline" ? loadLatestReplay() : data ? setSnapshot(data) : loadLatestReplay())
+        .then(([data, status]) => status?.status === "offline" ? loadLatestReplay() : data ? setSnapshot(data as TableSnapshot) : loadLatestReplay())
         .catch(loadLatestReplay);
     } else {
       loadLatestReplay();
@@ -75,7 +84,7 @@ export default function Home() {
     const connect = () => {
       socket = new WebSocket(wsUrl);
       socket.onopen = () => {
-        if (!apiUrl) { setConnected(true); setOfflineReplay(false); return; }
+        if (!apiUrl) return;
         fetch(`${apiUrl.replace(/\/$/, "")}/v1/status`)
           .then((response) => response.ok ? response.json() : null)
           .then((status) => {
@@ -100,12 +109,13 @@ export default function Home() {
     return () => { if (retry) clearTimeout(retry); socket?.close(); };
   }, [applyMessage, setConnected, setSnapshot]);
 
+  const live = snapshot;
   return (
     <main className={`app-shell ${cleanCinema ? "cinema-mode" : ""}`}>
       <div className="film-grain" aria-hidden="true" />
       <header className="topbar">
         <div className="brand-lockup"><Sparkles className="brand-mark" size={16} /><span>FLY / POKER</span><small>AN EXPERIMENT IN WIRING</small></div>
-        <div className="live-status"><span className={`live-dot ${connected ? "online" : ""}`} />{connected ? "LIVE TABLE" : offlineReplay ? "LIVE TABLE ASLEEP · REPLAY" : "DEMO TABLE"}<span className="status-divider" />{snapshot.tournament_id}</div>
+        <div className="live-status"><span className={`live-dot ${connected ? "online" : ""}`} />{connected ? "LIVE TABLE" : offlineReplay ? "LIVE TABLE ASLEEP · REPLAY" : "LIVE TABLE ASLEEP"}<span className="status-divider" />{live?.tournament_id ?? "OFFLINE"}</div>
         <nav className="top-actions" aria-label="Table controls">
           <button className="icon-button" aria-label="Toggle clean cinema mode" onClick={toggleCinema}><Maximize2 size={16} /></button>
           <button className="icon-button" aria-label={`Switch camera, currently ${cameraMode}`} onClick={cycleCamera} title={`Camera: ${cameraMode}`}><Camera size={16} /></button>
@@ -115,40 +125,44 @@ export default function Home() {
       </header>
 
       <section className="hero-copy" aria-labelledby="page-title">
-        <p className="eyebrow"><Radio size={13} /> TABLE 01 / HAND {String(snapshot.hand_number).padStart(2, "0")}</p>
+        <p className="eyebrow"><Radio size={13} /> {live ? `TABLE 01 / HAND ${String(live.hand_number).padStart(2, "0")}` : "TABLE 01 / NO LIVE HAND"}</p>
         <h1 id="page-title">Six minds.<br /><em>One table.</em></h1>
         <p className="lede">A frozen connectome. A live poker table.<br />Watch the wiring make a move.</p>
       </section>
 
-      <section className="table-stage" aria-label="Live poker table">
-        <div className="scene-wrap"><CasinoScene players={snapshot.players} currentActor={snapshot.current_actor} lastEvent={snapshot.last_event} street={snapshot.street} board={snapshot.board} pot={snapshot.pot} cameraMode={cameraMode} inspectionMode={viewMode === "inspection"} reducedMotion={reducedMotion} /></div>
+      {live ? <section className="table-stage" aria-label="Live poker table">
+        <div className="scene-wrap"><CasinoScene players={live.players} currentActor={live.current_actor} lastEvent={live.last_event} street={live.street} board={live.board} pot={live.pot} cameraMode={cameraMode} inspectionMode={viewMode === "inspection"} reducedMotion={reducedMotion} /></div>
         <div className="table-shadow" aria-hidden="true" />
         <div className="table-ui table-ui-left">
-          <div className="signal-card" aria-live="polite"><span className="signal-kicker"><BrainCircuit size={13} /> NEURAL SIGNAL</span><strong>{snapshot.last_event}</strong><span className="mono">SEQ {String(snapshot.sequence).padStart(5, "0")} / {snapshot.street.toUpperCase()}</span></div>
+          <div className="signal-card" aria-live="polite"><span className="signal-kicker"><BrainCircuit size={13} /> NEURAL SIGNAL</span><strong>{live.last_event}</strong><span className="mono">SEQ {String(live.sequence).padStart(5, "0")} / {live.street.toUpperCase()}</span></div>
         </div>
         <div className="table-ui table-ui-right">
-          <div className="pot-card"><span className="signal-kicker">CURRENT POT</span><strong>{snapshot.pot.toLocaleString()} <small>CHIPS</small></strong><span className="mono">BLINDS {snapshot.blinds}</span></div>
+          <div className="pot-card"><span className="signal-kicker">CURRENT POT</span><strong>{live.pot.toLocaleString()} <small>CHIPS</small></strong><span className="mono">BLINDS {live.blinds}</span></div>
         </div>
-      </section>
+      </section> : <OfflineState replay={offlineReplay} />}
 
-      {!cleanCinema && <>
+      {!cleanCinema && live && selectedFly && <>
         <section className="player-rail" aria-label="Players">
-          {snapshot.players.map((player) => <PlayerCard key={player.id} player={player} active={snapshot.current_actor === player.id} selected={selectedFlyId === player.id} onClick={() => selectFly(player.id)} />)}
+          {live.players.map((player) => <PlayerCard key={player.id} player={player} active={live.current_actor === player.id} selected={selectedFlyId === player.id} onClick={() => selectFly(player.id)} />)}
         </section>
         <section className="bottom-deck">
           <div className="deck-tabs" role="tablist" aria-label="Spectator panels">
             <button className={viewMode === "broadcast" ? "active" : ""} onClick={() => setViewMode("broadcast")}><Camera size={15} /> Broadcast</button>
             <button className={viewMode === "inspection" ? "active" : ""} onClick={() => setViewMode("inspection")}><Eye size={15} /> Inspect fly</button>
           </div>
-          {viewMode === "inspection" ? <InspectionPanel player={selectedFly} snapshot={snapshot} decision={decisions[selectedFly.id]} telemetry={telemetry[selectedFly.id]} /> : <BroadcastPanel snapshot={snapshot} />}
-          <HonestyPanel mode={snapshot.mode} />
+          {viewMode === "inspection" ? <InspectionPanel player={selectedFly} snapshot={live} decision={decisions[selectedFly.id]} telemetry={telemetry[selectedFly.id]} /> : <BroadcastPanel snapshot={live} />}
+          <HonestyPanel mode={live.mode} />
         </section>
-        <PortfolioNote mode={snapshot.mode} connected={connected} />
+        <PortfolioNote mode={live.mode} connected={connected} />
       </>}
 
-      <footer className="footer-note"><span><Wifi size={13} /> READ-ONLY SPECTATOR MODE / SIMULATED CHIPS</span><span><Info size={13} /> {snapshot.mode === "flybrain" ? "THE WIRING IS REAL. THE POKER IS ENGINEERED." : "DEVELOPMENT ADAPTER — NO BIOLOGICAL CLAIM"}</span><span>{connected ? "STREAM STABLE" : "LIVE TABLE ASLEEP — SHOWING LAST TABLE STATE"} {connected ? <Wifi size={13} /> : <WifiOff size={13} />}</span></footer>
+      <footer className="footer-note"><span><Wifi size={13} /> READ-ONLY SPECTATOR MODE / SIMULATED CHIPS</span><span><Info size={13} /> {live?.mode === "flybrain" ? "THE WIRING IS REAL. THE POKER IS ENGINEERED." : "NO LIVE GPU DATA"}</span><span>{connected ? "STREAM STABLE" : offlineReplay ? "LIVE TABLE ASLEEP — SHOWING RECORDED REPLAY" : "LIVE TABLE ASLEEP — NO RECORDED REPLAY"} {connected ? <Wifi size={13} /> : <WifiOff size={13} />}</span></footer>
     </main>
   );
+}
+
+function OfflineState({ replay }: { replay: boolean }) {
+  return <section className="table-stage offline-stage" aria-live="polite"><div className="offline-card"><span className="panel-kicker">LIVE HOST {replay ? "ASLEEP" : "UNAVAILABLE"}</span><h2>{replay ? "Recorded hand ready." : "No live hand is running."}</h2><p>{replay ? "This view contains only the last persisted FlyBrain/PokerKit event journal." : "The GPU host is offline or has not passed its readiness gate. No synthetic table is shown."}</p>{replay ? <a className="replay-link" href="/replay/latest">OPEN LATEST REPLAY ↗</a> : <span className="mono">WAITING FOR VERIFIED FLYBRAIN EVENTS</span>}</div></section>;
 }
 
 function PortfolioNote({ mode, connected }: { mode: "simulated" | "flybrain"; connected: boolean }) {
@@ -223,11 +237,11 @@ function PlayerCard({ player, active, selected, onClick }: { player: FlyPlayer; 
   </button>;
 }
 
-function BroadcastPanel({ snapshot }: { snapshot: typeof FALLBACK_SNAPSHOT }) {
+function BroadcastPanel({ snapshot }: { snapshot: TableSnapshot }) {
   return <div className="broadcast-panel"><div><span className="panel-kicker">THE HAND</span><strong>{snapshot.board.length ? snapshot.board.join("  ") : "Waiting for the first reveal"}</strong></div><div className="broadcast-copy">Every action is decoded from a frozen connectome and a trained linear readout. The spectators see the cards; the flies only see what the table would show them.</div><a className="replay-link" href={`/replay/${snapshot.tournament_id}-${snapshot.hand_id}`}>Open replay ↗</a></div>;
 }
 
-function InspectionPanel({ player, snapshot, decision, telemetry }: { player: FlyPlayer; snapshot: typeof FALLBACK_SNAPSHOT; decision?: { features: Record<string, number>; legalActions: string[]; logits: Record<string, number>; sizing?: string }; telemetry?: NeuralTelemetry }) {
+function InspectionPanel({ player, snapshot, decision, telemetry }: { player: FlyPlayer; snapshot: TableSnapshot; decision?: { features: Record<string, number>; legalActions: string[]; logits: Record<string, number>; sizing?: string }; telemetry?: NeuralTelemetry }) {
   const features = Object.entries(telemetry?.features ?? decision?.features ?? { LC10a: player.equity, LPLC1: 1 - player.equity * 0.7, LPLC2: player.activity, LC4: Math.min(1, player.activity * 0.8) });
   const legalActions = decision?.legalActions.length ? decision.legalActions : ["fold", "call", "raise"];
   const logits = Object.entries(decision?.logits ?? {});
@@ -317,5 +331,5 @@ function BrainSample({ activity, regions, sampledSpikes }: { activity: number; r
 }
 
 function HonestyPanel({ mode }: { mode: "simulated" | "flybrain" }) {
-  return <details className="honesty-panel"><summary><Info size={14} /> WHAT IS REAL? <span>{mode === "flybrain" ? "MALECNS RUNTIME" : "DEVELOPMENT ADAPTER"}</span></summary><div className="honesty-copy"><p><strong>Real:</strong> the MaleCNS wiring and LIF network when the optional host is enabled, plus the PokerKit rules engine and recorded event protocol.</p><p><strong>Engineered:</strong> poker inputs are feature-detector pulses, and poker strategy lives in trained linear readouts. Per-fly seeded neural states and separate readout variants create the six profiles.</p><p><strong>Not claimed:</strong> this is not evidence that biological flies understand poker. The current browser build is explicitly marked simulated until the data, CUDA runtime, and readout manifest pass the readiness probe.</p><p className="model-credit">Scene assets: <a href="https://opengameart.org/content/spy-fly" target="_blank" rel="noreferrer">Spy Fly by sunburn</a> (CC BY 3.0) and <a href="https://opengameart.org/content/poker-pack" target="_blank" rel="noreferrer">Poker Pack by mehrasaur</a> (CC0).</p></div></details>;
+  return <details className="honesty-panel"><summary><Info size={14} /> WHAT IS REAL? <span>{mode === "flybrain" ? "MALECNS RUNTIME" : "DEVELOPMENT ONLY"}</span></summary><div className="honesty-copy"><p><strong>Real:</strong> the MaleCNS wiring and LIF network, PokerKit rules, and recorded event protocol are shown only after the live readiness gate passes.</p><p><strong>Engineered:</strong> poker inputs are feature-detector pulses, and poker strategy lives in trained linear readouts. Per-fly seeded neural states and separate readout variants create the six profiles.</p><p><strong>Not claimed:</strong> this is not evidence that biological flies understand poker. Offline mode never substitutes synthetic cards or neural activity.</p><p className="model-credit">Scene assets: <a href="https://opengameart.org/content/spy-fly" target="_blank" rel="noreferrer">Spy Fly by sunburn</a> (CC BY 3.0) and <a href="https://opengameart.org/content/poker-pack" target="_blank" rel="noreferrer">Poker Pack by mehrasaur</a> (CC0).</p></div></details>;
 }

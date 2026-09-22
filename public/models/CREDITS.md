@@ -16,3 +16,11 @@
 - **Use in this project:** `table.obj`/`table.mtl`, `card.obj`/`card.mtl`, and `chip_25.obj`/`chip_25.mtl` provide the physical table, card, and chip meshes. Labels, card values, and chip counts remain event-driven overlays so recorded hands stay deterministic.
 
 The downloaded source archives are intentionally not served to browsers. Only the optimized runtime assets in this directory are shipped.
+
+## Chairs
+
+- **Pack:** Furniture Kit, by **Kenney**
+- **Source:** https://opengameart.org/content/furniture-kit
+- **License:** CC0 1.0 (public domain)
+- **Use in this project:** `chair.obj`/`chair.mtl` provide the six human-scale casino chairs.
+- **Runtime SHA-256:** `395BA37182DE517F58A2B0993FFCF4AE01A858285E269191509C6E2F1FD406F2` (`chair.obj`), `DC0E8EEB2FEF684CC9AB72E9532312EF8796C5035D3C5F23BA768EF6DAE17806` (`chair.mtl`)

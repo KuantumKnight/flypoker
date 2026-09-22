@@ -1,25 +1,24 @@
 "use client";
 
 import { create } from "zustand";
-import type { DecisionTelemetry, EventEnvelope, FlyPlayer, LiveMessage, NeuralTelemetry, TableSnapshot } from "./types";
-import { FALLBACK_SNAPSHOT } from "./types";
+import type { DecisionTelemetry, EventEnvelope, LiveMessage, NeuralTelemetry, TableSnapshot } from "./types";
 
 type ViewMode = "broadcast" | "inspection";
 export type CameraMode = "broadcast" | "table" | "macro";
 
 type FlyPokerStore = {
-  snapshot: TableSnapshot;
+  snapshot: TableSnapshot | null;
   connected: boolean;
   viewMode: ViewMode;
   cameraMode: CameraMode;
-  selectedFlyId: string;
+  selectedFlyId: string | null;
   cleanCinema: boolean;
   muted: boolean;
   reducedMotion: boolean;
   events: EventEnvelope[];
   telemetry: Record<string, NeuralTelemetry>;
   decisions: Record<string, DecisionTelemetry>;
-  setSnapshot: (snapshot: TableSnapshot) => void;
+  setSnapshot: (snapshot: TableSnapshot | null) => void;
   applyMessage: (message: LiveMessage) => void;
   setConnected: (connected: boolean) => void;
   setViewMode: (viewMode: ViewMode) => void;
@@ -31,11 +30,11 @@ type FlyPokerStore = {
 };
 
 export const useFlyPokerStore = create<FlyPokerStore>((set) => ({
-  snapshot: FALLBACK_SNAPSHOT,
+  snapshot: null,
   connected: false,
   viewMode: "broadcast",
   cameraMode: "broadcast",
-  selectedFlyId: "vesper",
+  selectedFlyId: null,
   cleanCinema: false,
   muted: true,
   reducedMotion: false,
@@ -44,14 +43,20 @@ export const useFlyPokerStore = create<FlyPokerStore>((set) => ({
   decisions: {},
   setSnapshot: (snapshot) => set({ snapshot }),
   applyMessage: (message) => {
-    if (message.kind === "snapshot") {
-      set({ snapshot: message.snapshot });
+    if (message.kind === "status") {
+      set({ connected: message.status.status === "live" });
       return;
     }
+    if (message.kind === "snapshot") {
+      set({ snapshot: message.snapshot, connected: true });
+      return;
+    }
+    if (!message.event) return;
     const event = message.event;
     set((state) => {
       // Reconnects can replay the last few frames; keep the visual state
       // monotonic so snapshot-to-event handoff never jumps backwards.
+      if (!state.snapshot) return state;
       if (event.sequence <= state.snapshot.sequence) return state;
       const nextSnapshot = { ...state.snapshot };
       const payload = event.payload;

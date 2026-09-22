@@ -93,9 +93,14 @@ export interface EventMessage {
   event: EventEnvelope;
 }
 
+export interface StatusMessage {
+  kind: "status";
+  status: StatusResponse;
+}
+
 export interface StatusResponse {
   status: "live" | "starting" | "offline";
-  mode: "simulated" | "flybrain";
+  mode: "simulated" | "flybrain" | "offline";
   gpu: string;
   connected_spectators: number;
   step_latency_ms: number;

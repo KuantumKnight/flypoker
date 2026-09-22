@@ -14,17 +14,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from .engine import LiveEngine
 from .brain_adapter import FlyBrainBatchAdapter
 from .brain_worker import BrainWorkerConfig, BrainWorkerProcess
-from .models import EventEnvelope, EventMessage, SnapshotMessage, StatusResponse
+from .models import EventEnvelope, EventMessage, SnapshotMessage, StatusMessage, StatusResponse
 
 
-requested_mode = os.environ.get("FLYPOKER_MODE", "simulated")
+requested_mode = os.environ.get("FLYPOKER_MODE", "flybrain")
+dev_simulator = os.environ.get("FLYPOKER_DEV_SIMULATOR", "0").lower() in {"1", "true", "yes"}
 readout_dir = os.environ.get("FLYPOKER_READOUT_DIR", "artifacts/readout-male-cns-gpu")
 data_dir = os.environ.get("FLY_DATA", "fly-data")
 brain_variant = os.environ.get("FLY_VARIANT", "profiles")
 brain_seed = int(os.environ.get("FLY_BRAIN_SEED", "20260921"))
-brain_probe = FlyBrainBatchAdapter(readout_dir, data_dir=data_dir, device=os.environ.get("FLY_DEVICE", "cuda"), variant=brain_variant, seed=brain_seed).probe() if requested_mode == "flybrain" else (False, "simulated development adapter")
+brain_probe = FlyBrainBatchAdapter(readout_dir, data_dir=data_dir, device=os.environ.get("FLY_DEVICE", "cuda"), variant=brain_variant, seed=brain_seed).probe() if requested_mode == "flybrain" else (False, "simulator disabled in production")
 brain_worker = BrainWorkerProcess(BrainWorkerConfig(artifact_dir=readout_dir, data_dir=data_dir, device=os.environ.get("FLY_DEVICE", "cuda"), variant=brain_variant, seed=brain_seed)) if brain_probe[0] else None
 engine = LiveEngine(brain_worker=brain_worker, restore_checkpoint=True, brain_seed=brain_seed)
+live_available = False
 allowed_origins = {
     origin.strip()
     for origin in os.environ.get("FLYPOKER_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
@@ -61,39 +63,49 @@ def _connection_allowed(client_id: str) -> bool:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global live_available
     worker_watchdog: asyncio.Task[None] | None = None
     if brain_worker:
         brain_worker.start()
         ready = await asyncio.to_thread(brain_worker.wait_ready, 45.0)
         if ready:
             engine.snapshot.mode = "flybrain"
+            live_available = True
         else:
             brain_worker.stop()
             engine.brain_worker = None
         if ready:
             async def supervise_brain_worker() -> None:
+                global live_available
                 while True:
                     await asyncio.sleep(2.0)
                     if brain_worker.alive:
                         continue
                     engine.brain_worker = None
-                    engine.snapshot.mode = "simulated"
-                    await engine._emit("system.status", {"status": "brain-worker-restarting", "mode": "simulated"})
+                    live_available = False
+                    await engine.stop()
                     try:
                         engine.brain_worker_restarts += 1
                         brain_worker.start()
                         if await asyncio.to_thread(brain_worker.wait_ready, 20.0):
                             engine.brain_worker = brain_worker
                             engine.snapshot.mode = "flybrain"
-                            await engine._emit("system.status", {"status": "brain-worker-ready", "mode": "flybrain"})
+                            live_available = True
                             engine.request_brain_reset("GPU worker restarted; restored last completed hand")
+                            await engine.start()
                         else:
                             brain_worker.stop()
                     except Exception:
                         brain_worker.stop()
             worker_watchdog = asyncio.create_task(supervise_brain_worker(), name="fly-poker-brain-watchdog")
-    await engine.start()
+    elif dev_simulator:
+        engine.snapshot.mode = "simulated"
+        live_available = True
+        await engine.start()
+    if live_available and not (engine._task and not engine._task.done()):
+        await engine.start()
     yield
+    live_available = False
     if worker_watchdog:
         worker_watchdog.cancel()
         await asyncio.gather(worker_watchdog, return_exceptions=True)
@@ -120,8 +132,8 @@ async def health_live() -> dict[str, str]:
 @app.get("/health/ready")
 async def health_ready() -> dict[str, str]:
     active = bool(engine.brain_worker and engine.brain_worker.alive)
-    runtime = "available" if active else ("unavailable" if requested_mode == "flybrain" else "simulated")
-    if requested_mode == "flybrain" and not active:
+    runtime = "available" if active else ("simulated" if dev_simulator else "unavailable")
+    if not active and not dev_simulator:
         raise HTTPException(status_code=503, detail={"status": "offline", "mode": "flybrain", "brainRuntime": runtime, "runtimeNote": brain_probe[1]})
     return {"status": "ready", "mode": "flybrain" if active else "simulated", "brainRuntime": runtime, "runtimeNote": brain_probe[1]}
 
@@ -129,8 +141,8 @@ async def health_ready() -> dict[str, str]:
 @app.get("/v1/status", response_model=StatusResponse)
 async def status() -> StatusResponse:
     active = bool(engine.brain_worker and engine.brain_worker.alive)
-    runtime = "available" if active else ("unavailable" if requested_mode == "flybrain" else "simulated")
-    return StatusResponse(status="live" if active or requested_mode != "flybrain" else "offline", mode="flybrain" if active else "simulated", gpu="RTX 5070 / FlyBrain batch=6" if active else "mock-adapter", connected_spectators=engine.connected_spectators, step_latency_ms=round(engine.step_latency_ms or 1.4, 2), current_hand=engine.hand_number, brain_runtime=runtime, runtime_note=brain_probe[1])
+    runtime = "available" if active else ("simulated" if dev_simulator else "unavailable")
+    return StatusResponse(status="live" if active or dev_simulator else "offline", mode="flybrain" if active else ("simulated" if dev_simulator else "offline"), gpu="RTX 5070 / FlyBrain batch=6" if active else "offline", connected_spectators=engine.connected_spectators, step_latency_ms=round(engine.step_latency_ms or 0.0, 2), current_hand=engine.hand_number if active else 0, brain_runtime=runtime, runtime_note=brain_probe[1])
 
 
 @app.get("/v1/metrics")
@@ -160,6 +172,8 @@ async def metrics() -> dict[str, object]:
 
 @app.get("/v1/live/snapshot")
 async def live_snapshot():
+    if not live_available:
+        raise HTTPException(status_code=503, detail={"status": "offline", "runtimeNote": brain_probe[1]})
     return engine.snapshot.model_dump(mode="json")
 
 
@@ -168,9 +182,9 @@ async def replay(slug: str):
     if slug == "latest":
         latest = engine.store.latest_completed_events()
         if latest is None:
-            return {"slug": "latest", "mode": engine.snapshot.mode, "events": [], "snapshot": engine.snapshot.model_dump(mode="json")}
+            raise HTTPException(status_code=404, detail="Replay unavailable")
         latest_slug, events = latest
-        return {"slug": latest_slug, "mode": engine.snapshot.mode, "events": events, "snapshot": engine.snapshot.model_dump(mode="json")}
+        return {"slug": latest_slug, "mode": "flybrain", "events": events, "snapshot": engine.snapshot.model_dump(mode="json")}
     events = [event.model_dump(mode="json", by_alias=True) for event in engine.recent_events if slug.endswith(event.hand_id)]
     if not events:
         # Stable replay URLs are `<tournament-id>-hand-####`. Resolve the
@@ -184,7 +198,9 @@ async def replay(slug: str):
             requested_tournament = engine.tournament_id
             requested_hand = slug if slug.startswith("hand-") else f"hand-{slug.split('-')[-1]}"
         events = engine.store.hand_events(requested_tournament, requested_hand)
-    return {"slug": slug, "mode": engine.snapshot.mode, "events": events, "snapshot": engine.snapshot.model_dump(mode="json")}
+    if not events:
+        raise HTTPException(status_code=404, detail="Replay unavailable")
+    return {"slug": slug, "mode": "flybrain", "events": events, "snapshot": engine.snapshot.model_dump(mode="json")}
 
 
 @app.websocket("/v1/live/ws")
@@ -204,6 +220,11 @@ async def live_websocket(websocket: WebSocket):
         await websocket.close(code=1013, reason="spectator capacity reached")
         return
     await websocket.accept()
+    if not live_available:
+        offline_status = await status()
+        await websocket.send_json(StatusMessage(status=offline_status).model_dump(mode="json"))
+        await websocket.close(code=1001, reason="live table asleep")
+        return
     engine.connected_spectators += 1
     queue: asyncio.Queue[EventEnvelope] = asyncio.Queue(maxsize=64)
 

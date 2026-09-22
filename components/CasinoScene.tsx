@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Float, OrbitControls, PerspectiveCamera, Sparkles, useGLTF } from "@react-three/drei";
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
 import * as THREE from "three";
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
@@ -11,20 +11,42 @@ import type { FlyPlayer } from "@/lib/types";
 import type { CameraMode } from "@/lib/store";
 
 export default function CasinoScene({ players, currentActor, lastEvent, street, board = [], pot = 0, cameraMode = "broadcast", inspectionMode = false, reducedMotion }: { players: FlyPlayer[]; currentActor: string | null; lastEvent?: string; street?: string; board?: string[]; pot?: number; cameraMode?: CameraMode; inspectionMode?: boolean; reducedMotion: boolean }) {
-  const [canvasReady, setCanvasReady] = useState(false);
-  const enableWebgl = process.env.NEXT_PUBLIC_ENABLE_WEBGL_SCENE !== "false";
-  if (!enableWebgl) return <StaticCasinoScene players={players} currentActor={currentActor} board={board} pot={pot} />;
-  return <Canvas fallback={canvasReady ? null : <StaticCasinoScene players={players} currentActor={currentActor} board={board} pot={pot} />} dpr={[1, 1.35]} gl={{ antialias: false, alpha: false }} onCreated={({ gl, scene }) => {
-    setCanvasReady(true);
-    gl.setClearColor("#0b0e0c", 1);
-    scene.background = new THREE.Color("#0b0e0c");
-    // Keep the React scene mounted across a transient driver/context reset.
-    // WebGL will normally restore the context; replacing the Canvas here made
-    // a momentary reset permanently downgrade the live table to CSS.
-    gl.domElement.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-    });
-  }} onError={(error) => console.error("Fly Poker WebGL scene error", error)}>
+  const [rendererState, setRendererState] = useState<"initializing" | "ready" | "context-lost" | "restoring" | "error">("initializing");
+  const [canvasKey, setCanvasKey] = useState(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasElement = useRef<HTMLCanvasElement | null>(null);
+  const handleContextLost = useCallback((event: Event) => {
+    event.preventDefault();
+    setRendererState("context-lost");
+    if (!retryTimer.current) {
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = null;
+        setRendererState("restoring");
+        setCanvasKey((key) => key + 1);
+      }, 800);
+    }
+  }, []);
+  const handleContextRestored = useCallback(() => {
+    setRendererState("ready");
+  }, []);
+  useEffect(() => () => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    canvasElement.current?.removeEventListener("webglcontextlost", handleContextLost);
+    canvasElement.current?.removeEventListener("webglcontextrestored", handleContextRestored);
+  }, [handleContextLost, handleContextRestored]);
+  const retry = () => {
+    setRendererState("initializing");
+    setCanvasKey((key) => key + 1);
+  };
+  return <div className="webgl-scene-shell">
+    <SceneErrorBoundary fallback={<WebglErrorState onRetry={retry} />}><Canvas key={canvasKey} dpr={[1, 1.35]} gl={{ antialias: false, alpha: false }} onCreated={({ gl, scene }) => {
+      setRendererState("ready");
+      gl.setClearColor("#0b0e0c", 1);
+      scene.background = new THREE.Color("#0b0e0c");
+      canvasElement.current = gl.domElement;
+      gl.domElement.addEventListener("webglcontextlost", handleContextLost, { passive: false });
+      gl.domElement.addEventListener("webglcontextrestored", handleContextRestored);
+    }} onError={(error) => { console.error("Fly Poker WebGL scene error", error); setRendererState("error"); }}>
     <ResponsiveCamera />
     <color attach="background" args={["#0b0e0c"]} />
     <SceneBackground />
@@ -34,20 +56,17 @@ export default function CasinoScene({ players, currentActor, lastEvent, street, 
     <pointLight position={[5, 2, -1]} intensity={25} color="#b75546" />
     <Sparkles count={90} scale={[11, 5, 8]} size={1.2} speed={0.18} opacity={0.18} color="#d4c29c" />
     <CameraRig players={players} currentActor={currentActor} lastEvent={lastEvent} street={street} cameraMode={cameraMode} inspectionMode={inspectionMode} reducedMotion={reducedMotion} />
-    <SceneErrorBoundary fallback={<ProceduralTable board={board} pot={pot} />}><Suspense fallback={<group />}><Table board={board} pot={pot} /></Suspense></SceneErrorBoundary>
-    {players.map((player) => <SceneErrorBoundary key={player.id} fallback={<ProceduralFlyAvatar player={player} active={currentActor === player.id} reducedMotion={reducedMotion} />}><FlyAvatar player={player} active={currentActor === player.id} reducedMotion={reducedMotion} /></SceneErrorBoundary>)}
-    <OrbitControls enablePan={false} enableZoom={false} minPolarAngle={1.03} maxPolarAngle={1.3} target={[0, 0, 0]} />
-  </Canvas>;
+    <Suspense fallback={<group />}><Table board={board} pot={pot} /></Suspense>
+    <Suspense fallback={<group />}><Chairs /></Suspense>
+    {players.map((player) => <FlyAvatar key={player.id} player={player} active={currentActor === player.id} reducedMotion={reducedMotion} />)}
+    <OrbitControls enablePan={false} enableZoom={false} minPolarAngle={0.78} maxPolarAngle={1.3} target={[0, 0.42, 0]} />
+  </Canvas></SceneErrorBoundary>
+    {rendererState !== "ready" && <div className="webgl-status-overlay" role="status"><span className="panel-kicker">WEBGL / {rendererState.replace("-", " ").toUpperCase()}</span>{rendererState === "context-lost" || rendererState === "restoring" ? <strong>Restoring the live scene…</strong> : rendererState === "error" ? <WebglErrorState onRetry={retry} /> : <strong>Loading verified open-source scene assets…</strong>}</div>}
+  </div>;
 }
 
-function StaticCasinoScene({ players, currentActor, board, pot }: { players: FlyPlayer[]; currentActor: string | null; board: string[]; pot: number }) {
-  return <div className="scene-fallback" aria-label="Static cinematic poker table fallback">
-    <div className="fallback-table">
-      <div className="fallback-board">{board.map((card) => <span key={card} className={card.includes("♥") || card.includes("♦") ? "red-card" : ""}>{card}</span>)}</div>
-      <div className="fallback-pot">{pot.toLocaleString()} <small>CHIPS</small></div>
-      {players.map((player) => <div key={player.id} className={`fallback-fly seat-${player.seat} ${currentActor === player.id ? "active" : ""}`} style={{ "--accent": player.accent } as CSSProperties}><i />{player.name}</div>)}
-    </div>
-  </div>;
+function WebglErrorState({ onRetry }: { onRetry: () => void }) {
+  return <div className="webgl-error-state"><strong>WebGL scene unavailable</strong><span>The renderer or a verified scene asset failed. No replacement geometry is shown.</span><button type="button" onClick={onRetry}>RETRY WEBGL</button></div>;
 }
 
 function SceneBackground() {
@@ -70,14 +89,14 @@ function CameraRig({ players, currentActor, lastEvent, street, cameraMode, inspe
     const dramatic = street === "showdown" || event.includes("takes the pot") || event.includes("all-in") || event.includes("claims the table") || event.includes("leaves the felt") || event.includes("raise");
     const reveal = event.includes("arrives") || event.includes("reveal");
     let destination: THREE.Vector3;
-    let lookAt = new THREE.Vector3(0, 0, 0);
+    let lookAt = new THREE.Vector3(0, 0.42, 0);
     if (cameraMode === "table") {
-      destination = new THREE.Vector3(0, 10.4, 5.8);
+      destination = new THREE.Vector3(0, 3.8, 3.2);
     } else if (cameraMode === "macro" && focus) {
-      destination = new THREE.Vector3(x * 0.42, 4.0, z + 3.65);
-      lookAt = new THREE.Vector3(x, 0.35, z);
+      destination = new THREE.Vector3(x * 0.34, 1.7, z + 1.7);
+      lookAt = new THREE.Vector3(x, 0.52, z);
     } else {
-      destination = new THREE.Vector3(dramatic ? 0 : x * (reveal ? 0.35 : 0.55), dramatic ? 7.4 : reveal ? 7.0 : 6.6, dramatic ? 9.8 : reveal ? 9.15 : 8.4 + z * 0.18);
+      destination = new THREE.Vector3(dramatic ? 0 : x * (reveal ? 0.35 : 0.55), dramatic ? 4.9 : reveal ? 4.5 : 4.0, dramatic ? 5.7 : reveal ? 5.2 : 4.8 + z * 0.18);
     }
     tween.current?.kill();
     tween.current = gsap.to(camera.position, {
@@ -106,7 +125,7 @@ function CameraRig({ players, currentActor, lastEvent, street, cameraMode, inspe
     if (cameraMode === "table" || cameraMode === "macro") return;
     if (event.includes("claims the table")) {
       const angle = clock.elapsedTime * 0.16;
-      const orbit = new THREE.Vector3(Math.sin(angle) * 9.2, 7.4, Math.cos(angle) * 9.2);
+      const orbit = new THREE.Vector3(Math.sin(angle) * 5.6, 4.1, Math.cos(angle) * 5.6);
       camera.position.lerp(orbit, 0.035);
       camera.lookAt(0, 0, 0);
       return;
@@ -148,34 +167,42 @@ function Table({ board, pot }: { board: string[]; pot: number }) {
     return clone;
   }, [table]);
   return <group rotation={[-0.02, 0, 0]}>
-    <primitive object={tableModel} position={[0, -0.52, 0]} scale={[5.4, 2.3, 3.02]} />
-    <mesh receiveShadow position={[0, -0.55, 0]} rotation={[0, 0, 0]}>
-      <cylinderGeometry args={[4.6, 4.8, 0.8, 64]} /><meshStandardMaterial color="#211710" roughness={0.72} metalness={0.12} />
+    <primitive object={tableModel} position={[0, 0.28, 0]} scale={[1.5, 0.92, 0.39]} />
+    <mesh receiveShadow position={[0, 0.08, 0]} rotation={[0, 0, 0]}>
+      <cylinderGeometry args={[1.22, 1.27, 0.18, 64]} /><meshStandardMaterial color="#211710" roughness={0.72} metalness={0.12} />
     </mesh>
-    <mesh receiveShadow position={[0, -0.05, 0]} scale={[1, 1, 0.62]}>
-      <cylinderGeometry args={[4.35, 4.35, 0.12, 64]} /><meshStandardMaterial color="#174633" roughness={0.92} metalness={0.02} />
+    <mesh receiveShadow position={[0, 0.18, 0]} scale={[1, 1, 0.5]}>
+      <cylinderGeometry args={[1.16, 1.16, 0.055, 64]} /><meshStandardMaterial color="#174633" roughness={0.92} metalness={0.02} />
     </mesh>
-    <mesh position={[0, 0.02, 0]} scale={[1, 1, 0.62]}>
-      <torusGeometry args={[4.17, 0.07, 12, 64]} /><meshStandardMaterial color="#c39444" roughness={0.4} metalness={0.82} emissive="#2f1d07" />
+    <mesh position={[0, 0.21, 0]} scale={[1, 1, 0.5]}>
+      <torusGeometry args={[1.1, 0.018, 12, 64]} /><meshStandardMaterial color="#c39444" roughness={0.4} metalness={0.82} emissive="#2f1d07" />
     </mesh>
-    <mesh position={[0, 0.035, 0]} scale={[1, 1, 0.62]}>
-      <torusGeometry args={[2.25, 0.015, 8, 64]} /><meshStandardMaterial color="#3b7057" roughness={0.9} />
+    <mesh position={[0, 0.22, 0]} scale={[1, 1, 0.5]}>
+      <torusGeometry args={[0.58, 0.006, 8, 64]} /><meshStandardMaterial color="#3b7057" roughness={0.9} />
     </mesh>
-    <mesh position={[0, 0.05, 0]} rotation={[0, 0, 0]}>
-      <boxGeometry args={[0.9, 0.015, 0.47]} /><meshStandardMaterial color="#d5b25e" roughness={0.55} metalness={0.7} />
+    <mesh position={[0, 0.23, 0]} rotation={[0, 0, 0]}>
+      <boxGeometry args={[0.23, 0.008, 0.12]} /><meshStandardMaterial color="#d5b25e" roughness={0.55} metalness={0.7} />
     </mesh>
-    <mesh position={[0, 0.055, 0]}>
-      <boxGeometry args={[0.05, 0.02, 0.7]} /><meshStandardMaterial color="#1b251d" />
+    <mesh position={[0, 0.235, 0]}>
+      <boxGeometry args={[0.014, 0.012, 0.18]} /><meshStandardMaterial color="#1b251d" />
     </mesh>
-    <group position={[0, 0.12, -0.12]}>
-      {board.map((card, index) => <group key={`${card}-${index}`} position={[(index - (board.length - 1) / 2) * 0.56, 0, 0]} rotation={[0, 0, (index % 2 ? -1 : 1) * 0.035]}>
+    <group position={[0, 0.255, -0.03]}>
+      {board.map((card, index) => <group key={`${card}-${index}`} position={[(index - (board.length - 1) / 2) * 0.095, 0, 0]} rotation={[0, 0, (index % 2 ? -1 : 1) * 0.035]}>
         <RealCard object={cardObject} />
       </group>)}
     </group>
-    <group position={[1.02, 0.13, 0.05]}>
-      {Array.from({ length: Math.min(5, Math.max(1, Math.ceil(pot / 250))) }, (_, index) => <RealChip key={index} object={chipObject} position={[0, index * 0.06, 0]} />)}
+    <group position={[0.43, 0.27, 0.03]}>
+      {Array.from({ length: Math.min(5, Math.max(1, Math.ceil(pot / 250))) }, (_, index) => <RealChip key={index} object={chipObject} position={[0, index * 0.012, 0]} />)}
     </group>
   </group>;
+}
+
+function Chairs() {
+  const materials = useLoader(MTLLoader, "/models/chair.mtl");
+  materials.preload();
+  const chair = useLoader(OBJLoader, "/models/chair.obj", (loader) => loader.setMaterials(materials));
+  const instance = useMemo(() => chair.clone(), [chair]);
+  return <group>{seatPositionList().map(([x, , z, rotation], index) => <primitive key={index} object={instance.clone()} position={[x * 1.12, 0, z * 1.18]} rotation={[0, rotation + Math.PI, 0]} scale={[0.2, 0.2, 0.2]} />)}</group>;
 }
 
 class SceneErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -185,39 +212,24 @@ class SceneErrorBoundary extends Component<{ children: ReactNode; fallback: Reac
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-function ProceduralTable({ board, pot }: { board: string[]; pot: number }) {
-  return <group>
-    <mesh receiveShadow position={[0, -0.48, 0]} scale={[1, 1, 0.62]}><cylinderGeometry args={[4.55, 4.8, 0.82, 64]} /><meshStandardMaterial color="#211710" roughness={0.74} metalness={0.12} /></mesh>
-    <mesh receiveShadow position={[0, -0.04, 0]} scale={[1, 1, 0.62]}><cylinderGeometry args={[4.35, 4.35, 0.12, 64]} /><meshStandardMaterial color="#174633" roughness={0.92} /></mesh>
-    <mesh position={[0, 0.02, 0]} scale={[1, 1, 0.62]}><torusGeometry args={[4.17, 0.07, 12, 64]} /><meshStandardMaterial color="#c39444" roughness={0.4} metalness={0.82} /></mesh>
-    <group position={[0, 0.12, -0.12]}>{board.map((card, index) => <RealCardFallback key={`${card}-${index}`} card={card} position={[(index - (board.length - 1) / 2) * 0.56, 0, 0]} />)}</group>
-    <group position={[1.02, 0.13, 0.05]}>{Array.from({ length: Math.min(5, Math.max(1, Math.ceil(pot / 250))) }, (_, index) => <mesh key={index} position={[0, index * 0.06, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.12, 0.12, 0.035, 24]} /><meshStandardMaterial color={index % 2 ? "#e9e2d1" : "#c94e45"} roughness={0.45} metalness={0.3} /></mesh>)}</group>
-  </group>;
-}
-
-function RealCardFallback({ card, position }: { card: string; position: [number, number, number] }) {
-  return <group position={position}><mesh rotation={[0.03, 0.16, 0.08]}><boxGeometry args={[0.42, 0.04, 0.62]} /><meshStandardMaterial color="#e9e2d1" roughness={0.72} /></mesh><mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.22, 0.22]} /><meshBasicMaterial color={card.includes("♥") || card.includes("♦") ? "#a8443c" : "#17231b"} /></mesh></group>;
-}
-
 function ResponsiveCamera() {
   const { size } = useThree();
-  return <PerspectiveCamera makeDefault position={[0, 8.4, 10.5]} fov={size.width < 600 ? 58 : 33} />;
+  return <PerspectiveCamera makeDefault position={[0, 4.0, 4.8]} fov={size.width < 600 ? 58 : 38} />;
 }
 
 function RealCard({ object }: { object: THREE.Group }) {
   const instance = useMemo(() => object.clone(), [object]);
-  return <primitive object={instance} scale={[0.098, 0.014, 0.071]} rotation={[0, 0, 0.09]} position={[0, 0.018, 0]} />;
+  return <primitive object={instance} scale={[0.014, 0.006, 0.019]} rotation={[0, 0, 0.09]} position={[0, 0.004, 0]} />;
 }
 
 function RealChip({ object, position }: { object: THREE.Group; position: [number, number, number] }) {
   const instance = useMemo(() => object.clone(), [object]);
-  return <primitive object={instance} position={position} scale={[0.064, 0.07, 0.064]} rotation={[Math.PI / 2, 0, 0]} />;
+  return <primitive object={instance} position={position} scale={[0.008, 0.012, 0.008]} rotation={[Math.PI / 2, 0, 0]} />;
 }
 
 function FlyAvatar({ player, active, reducedMotion }: { player: FlyPlayer; active: boolean; reducedMotion: boolean }) {
   const gltfUrl = process.env.NEXT_PUBLIC_FLY_GLTF_URL || "/models/spyfly.glb";
-  if (gltfUrl) return <GltfFlyAvatar url={gltfUrl} player={player} active={active} reducedMotion={reducedMotion} />;
-  return <ProceduralFlyAvatar player={player} active={active} reducedMotion={reducedMotion} />;
+  return <GltfFlyAvatar url={gltfUrl} player={player} active={active} reducedMotion={reducedMotion} />;
 }
 
 function GltfFlyAvatar({ url, player, active, reducedMotion }: { url: string; player: FlyPlayer; active: boolean; reducedMotion: boolean }) {
@@ -254,17 +266,25 @@ function GltfFlyAvatar({ url, player, active, reducedMotion }: { url: string; pl
     // The source fly is authored in millimetres and reads too small at the
     // table's establishing-shot scale. Normalize it to a clearly visible
     // insect silhouette while preserving its original proportions.
-    const targetWidth = 2.1;
+    // Hero-scale the verified fly mesh so it can sit in the human-scale set
+    // without changing its anatomy or inventing a replacement body.
+    const targetWidth = 0.34;
     const scale = targetWidth / Math.max(0.001, size.x, size.z);
     return { scale, offset: new THREE.Vector3(-center.x, -bounds.min.y, -center.z) };
   }, [scene]);
   const group = useRef<THREE.Group>(null);
   const seat = seatPosition(player.seat);
+  const action = player.status.toLowerCase();
+  const reaching = active || /raise|call|check|all-in/.test(action);
+  const folded = /fold|eliminated/.test(action);
   useFrame(({ clock }) => {
     if (!group.current || reducedMotion) return;
-    const pulse = active ? Math.sin(clock.elapsedTime * 5.6) * 0.045 : Math.sin(clock.elapsedTime * 1.6 + player.seat) * 0.012;
-    group.current.position.y = seat[1] + pulse;
-    group.current.rotation.y = seat[3] + Math.sin(clock.elapsedTime * 0.4 + player.seat) * 0.04;
+    const phase = clock.elapsedTime;
+    const pulse = Math.sin(phase * (active ? 5.6 : 1.6) + player.seat) * (active ? 0.012 : 0.004);
+    const lean = reaching ? 0.12 : folded ? -0.08 : 0;
+    group.current.position.y = seat[1] + pulse + (folded ? -0.045 : 0);
+    group.current.rotation.y = seat[3] + Math.sin(phase * 0.4 + player.seat) * 0.025;
+    group.current.rotation.z = lean;
   });
   return <group ref={group} position={[seat[0], seat[1], seat[2]]} rotation={[0, seat[3], 0]} scale={fit.scale * (active ? 1.08 : 1)}>
     <primitive object={instance} position={[fit.offset.x, fit.offset.y, fit.offset.z]} />
@@ -388,9 +408,13 @@ function InsectCardHands({ player, active, reducedMotion }: { player: FlyPlayer;
   </group>;
 }
 
-function seatPosition(seat: number): [number, number, number, number] {
-  const positions: [number, number, number, number][] = [
-    [-3.35, 0, -1.95, 0.46], [-1.25, 0, -3.0, 0.08], [1.25, 0, -3.0, -0.08], [3.35, 0, -1.95, -0.46], [2.95, 0, 1.62, -2.46], [-2.95, 0, 1.62, 2.46],
+function seatPositionList(): [number, number, number, number][] {
+  return [
+    [-1.46, 0.46, -0.33, 0.36], [-0.68, 0.46, -0.62, 0.12], [0.68, 0.46, -0.62, -0.12], [1.46, 0.46, -0.33, -0.36], [1.22, 0.46, 0.38, -2.78], [-1.22, 0.46, 0.38, 2.78],
   ];
+}
+
+function seatPosition(seat: number): [number, number, number, number] {
+  const positions = seatPositionList();
   return positions[seat] ?? positions[0];
 }

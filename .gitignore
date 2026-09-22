@@ -32,3 +32,4 @@ artifacts/*.png
 services/api/data/*.db
 
 .vercel
+.env*

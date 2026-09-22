@@ -20,7 +20,7 @@ class EventPayload(TypedDict, total=False):
     """
 
     status: str
-    mode: Literal["simulated", "flybrain"]
+    mode: Literal["simulated", "flybrain", "offline"]
     reason: str
     message: str
     tournamentId: str
@@ -123,7 +123,7 @@ class EventMessage(BaseModel):
 
 class StatusResponse(BaseModel):
     status: Literal["live", "starting", "offline"]
-    mode: Literal["simulated", "flybrain"]
+    mode: Literal["simulated", "flybrain", "offline"]
     gpu: str
     connected_spectators: int
     step_latency_ms: float
@@ -131,3 +131,10 @@ class StatusResponse(BaseModel):
     brain_runtime: Literal["simulated", "available", "unavailable"] = "simulated"
     runtime_note: str = "development adapter"
     updated_at: str = Field(default_factory=now_iso)
+
+
+class StatusMessage(BaseModel):
+    """WebSocket frame sent when no verified live table is available."""
+
+    kind: Literal["status"] = "status"
+    status: StatusResponse

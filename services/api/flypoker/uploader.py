@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from pathlib import Path
 from urllib.request import Request, urlopen
 
 
 class ReplayUploader:
-    """Optional authenticated bridge to the Cloudflare R2 ingest Worker.
+    """Optional authenticated bridge to the Vercel Blob ingest route.
 
     It is disabled unless both environment variables are present. Upload
     failures are returned to the caller and never interrupt live poker.
@@ -15,7 +16,7 @@ class ReplayUploader:
 
     def __init__(self, endpoint: str | None = None, token: str | None = None) -> None:
         self.endpoint = endpoint or os.environ.get("FLYPOKER_REPLAY_UPLOAD_URL", "")
-        self.token = token or os.environ.get("FLYPOKER_REPLAY_UPLOAD_TOKEN", "")
+        self.token = token or os.environ.get("FLYPOKER_REPLAY_UPLOAD_TOKEN", "") or os.environ.get("BLOB_READ_WRITE_TOKEN", "") or _read_local_env("BLOB_READ_WRITE_TOKEN")
 
     @property
     def enabled(self) -> bool:
@@ -35,3 +36,15 @@ class ReplayUploader:
                 return False
 
         return await asyncio.to_thread(send)
+
+
+def _read_local_env(name: str) -> str:
+    """Read a local Vercel-linked secret without committing it to the repo."""
+    env_file = Path(__file__).resolve().parents[3] / ".env.local"
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith(f"{name}="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""

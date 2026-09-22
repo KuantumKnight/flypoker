@@ -2,7 +2,8 @@ param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")),
   [string]$NssmPath = "nssm.exe",
   [string]$TunnelConfig = (Join-Path $ProjectRoot "infra\cloudflared\config.yml"),
-  [string]$AllowedOrigins = "https://live.example.com"
+  [string]$AllowedOrigins = "https://flypoker.vercel.app",
+  [string]$ReplayUploadUrl = "https://flypoker.vercel.app/api/replays/ingest"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,10 +17,28 @@ if (-not (Test-Path -LiteralPath $TunnelConfig)) { throw "Copy config.example.ym
 $apiName = "FlyPokerApi"
 $tunnelName = "FlyPokerCloudflared"
 $apiArgs = "-m uvicorn flypoker.main:app --app-dir services/api --port 8000"
+$blobToken = $env:BLOB_READ_WRITE_TOKEN
+$envLocal = Join-Path $ProjectRoot ".env.local"
+if (-not $blobToken -and (Test-Path -LiteralPath $envLocal)) {
+  $blobLine = Get-Content -LiteralPath $envLocal | Where-Object { $_ -match '^BLOB_READ_WRITE_TOKEN=' } | Select-Object -First 1
+  if ($blobLine) { $blobToken = $blobLine.Substring('BLOB_READ_WRITE_TOKEN='.Length) }
+}
+$apiEnvironment = @(
+  "FLYPOKER_MODE=flybrain",
+  "FLY_DATA=fly-data",
+  "FLYPOKER_READOUT_DIR=artifacts/readout-male-cns-gpu",
+  "FLY_DEVICE=cuda",
+  "FLYPOKER_ALLOWED_ORIGINS=$AllowedOrigins",
+  "FLYPOKER_REQUIRE_ORIGIN=true",
+  "FLYPOKER_MAX_SPECTATORS=200",
+  "FLYPOKER_CONNECTIONS_PER_MINUTE=240",
+  "FLYPOKER_REPLAY_UPLOAD_URL=$ReplayUploadUrl"
+)
+if ($blobToken) { $apiEnvironment += "FLYPOKER_REPLAY_UPLOAD_TOKEN=$blobToken" }
 
 & $NssmPath install $apiName $python $apiArgs
 & $NssmPath set $apiName AppDirectory $ProjectRoot
-& $NssmPath set $apiName AppEnvironmentExtra "FLYPOKER_MODE=flybrain" "FLY_DATA=fly-data" "FLYPOKER_READOUT_DIR=artifacts/readout-male-cns-gpu" "FLY_DEVICE=cuda" "FLYPOKER_ALLOWED_ORIGINS=$AllowedOrigins" "FLYPOKER_REQUIRE_ORIGIN=true" "FLYPOKER_MAX_SPECTATORS=200" "FLYPOKER_CONNECTIONS_PER_MINUTE=240"
+& $NssmPath set $apiName AppEnvironmentExtra $apiEnvironment
 & $NssmPath set $apiName AppExit Default Restart
 & $NssmPath set $apiName AppRestartDelay 5000
 & $NssmPath set $apiName Start SERVICE_AUTO_START

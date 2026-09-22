@@ -28,6 +28,19 @@ h1 em { color: var(--brass); font-weight: 500; }
 .lede { color: #aaa99b; font-size: 13px; line-height: 1.65; margin: 29px 0 0; }
 .table-stage { height: 385px; margin: -172px auto 0; max-width: 1110px; position: relative; width: 82vw; }
 .scene-wrap { background: #0b0e0c; inset: 0; position: absolute; z-index: 1; }
+.webgl-scene-shell { height: 100%; inset: 0; overflow: hidden; position: absolute; width: 100%; }
+.webgl-scene-shell canvas { background: transparent !important; display: block; height: 100% !important; width: 100% !important; }
+.webgl-status-overlay { align-items: center; background: rgba(7, 12, 9, .82); display: flex; flex-direction: column; gap: 10px; inset: 0; justify-content: center; position: absolute; text-align: center; z-index: 4; }
+.webgl-status-overlay > strong { color: var(--ink); font-family: 'Libre Bodoni'; font-size: 18px; font-style: italic; font-weight: 500; }
+.webgl-error-state { align-items: center; display: flex; flex-direction: column; gap: 10px; max-width: 290px; padding: 22px; text-align: center; }
+.webgl-error-state strong { color: var(--ink); font-family: 'Libre Bodoni'; font-size: 20px; font-weight: 500; }
+.webgl-error-state span { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.webgl-error-state button { background: transparent; border: 1px solid var(--brass); color: var(--brass); cursor: pointer; font: 9px 'JetBrains Mono'; letter-spacing: .12em; padding: 9px 12px; }
+.webgl-error-state button:hover, .webgl-error-state button:focus-visible { background: var(--brass); color: var(--void); outline: none; }
+.offline-stage { align-items: center; display: flex; justify-content: center; }
+.offline-card { background: rgba(9, 14, 10, .84); border: 1px solid #283129; max-width: 460px; padding: 30px; text-align: center; }
+.offline-card h2 { font-family: 'Libre Bodoni'; font-size: 34px; font-weight: 500; margin: 12px 0 8px; }
+.offline-card p { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 18px; }
 .scene-stage { height: 100%; inset: 0; position: absolute; width: 100%; }
 .scene-stage canvas { background: transparent !important; inset: 0; position: absolute !important; z-index: 2; }
 .scene-fallback { align-items: center; background: radial-gradient(circle at 50% 45%, #172d22, #090d0b 72%); display: flex; height: 100%; inset: 0; justify-content: center; overflow: hidden; position: absolute; width: 100%; z-index: 1; }
