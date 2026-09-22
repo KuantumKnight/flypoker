@@ -30,3 +30,5 @@ artifacts/*.png
 
 # Runtime journals stay local to the host that runs the live table.
 services/api/data/*.db
+
+.vercel
