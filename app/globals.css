@@ -37,28 +37,31 @@ h1 em { color: var(--brass); font-weight: 500; }
 .webgl-error-state span { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .webgl-error-state button { background: transparent; border: 1px solid var(--brass); color: var(--brass); cursor: pointer; font: 9px 'JetBrains Mono'; letter-spacing: .12em; padding: 9px 12px; }
 .webgl-error-state button:hover, .webgl-error-state button:focus-visible { background: var(--brass); color: var(--void); outline: none; }
+.brain-map-empty { align-items: center; border: 1px solid #283129; color: var(--dim); display: flex; font: 9px 'JetBrains Mono'; height: 205px; justify-content: center; letter-spacing: .08em; text-align: center; }
 .offline-stage { align-items: center; display: flex; justify-content: center; }
 .offline-card { background: rgba(9, 14, 10, .84); border: 1px solid #283129; max-width: 460px; padding: 30px; text-align: center; }
 .offline-card h2 { font-family: 'Libre Bodoni'; font-size: 34px; font-weight: 500; margin: 12px 0 8px; }
 .offline-card p { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 18px; }
+.connection-test { border-top: 1px solid #283129; margin-top: 24px; padding-top: 18px; text-align: left; }
+.connection-test-button { background: transparent; border: 1px solid var(--brass); color: var(--brass); cursor: pointer; font: 9px 'JetBrains Mono'; letter-spacing: .11em; padding: 10px 12px; text-transform: uppercase; width: 100%; }
+.connection-test-button:hover, .connection-test-button:focus-visible { background: var(--brass); color: var(--void); outline: none; }
+.connection-test-button:disabled { cursor: wait; opacity: .6; }
+.connection-check { border: 1px solid #39443a; display: grid; gap: 9px; margin-top: 15px; padding: 13px; }
+.connection-check.success { border-color: #3c8a78; }
+.connection-check.failure { border-color: #765448; }
+.connection-check > strong { color: var(--brass); font: 10px 'JetBrains Mono'; letter-spacing: .1em; }
+.connection-check > .mono { color: var(--dim); font-size: 8px; }
+.connection-check-list { display: grid; gap: 8px; }
+.connection-check-line { align-items: flex-start; display: flex; gap: 8px; }
+.connection-check-line > span:last-child { display: grid; gap: 2px; }
+.connection-check-line b { color: var(--muted); font: 8px 'JetBrains Mono'; letter-spacing: .08em; }
+.connection-check-line small { color: var(--dim); font-size: 10px; line-height: 1.3; }
+.check-mark { border: 1px solid currentColor; display: inline-grid; flex: 0 0 15px; font: 11px 'JetBrains Mono'; height: 15px; place-items: center; width: 15px; }
+.check-mark.ok { color: var(--cyan); }
+.check-mark.bad { color: var(--red); }
 .scene-stage { height: 100%; inset: 0; position: absolute; width: 100%; }
 .scene-stage canvas { background: transparent !important; inset: 0; position: absolute !important; z-index: 2; }
-.scene-fallback { align-items: center; background: radial-gradient(circle at 50% 45%, #172d22, #090d0b 72%); display: flex; height: 100%; inset: 0; justify-content: center; overflow: hidden; position: absolute; width: 100%; z-index: 1; }
-.fallback-table { background: radial-gradient(ellipse at 50% 44%, #235d45 0, #174633 55%, #102d22 100%); border: 8px solid #5a3c21; border-radius: 50%; box-shadow: 0 0 0 3px #c39444, 0 22px 40px #000b; height: 76%; position: relative; width: 76%; }
-.fallback-board { display: flex; gap: 8px; justify-content: center; left: 50%; position: absolute; top: 39%; transform: translate(-50%, -50%); }
-.fallback-board span { background: #e7e0ce; border-radius: 3px; color: #17231b; font: 12px 'JetBrains Mono'; padding: 7px 6px; }
-.fallback-board .red-card { color: #a8443c; }
-.fallback-pot { color: #e8dfca; font: 10px 'JetBrains Mono'; left: 50%; position: absolute; top: 57%; transform: translateX(-50%); }
-.fallback-pot small { color: #c39444; font-size: 7px; }
-.fallback-fly { color: var(--accent); font: 9px 'JetBrains Mono'; position: absolute; text-transform: uppercase; white-space: nowrap; }
-.fallback-fly i { background: linear-gradient(90deg, #101511 0 42%, var(--accent) 43% 58%, #101511 59%); border: 1px solid var(--accent); border-radius: 50%; box-shadow: 0 0 12px var(--accent); display: inline-block; height: 9px; margin-right: 7px; position: relative; transform: rotate(-12deg); vertical-align: -1px; width: 22px; }
-.fallback-fly i::before, .fallback-fly i::after { background: #a9e9d4; border: 1px solid var(--accent); border-radius: 80% 20%; content: ''; height: 6px; opacity: .58; position: absolute; top: -5px; width: 11px; }
-.fallback-fly i::before { left: 1px; transform: rotate(18deg); }.fallback-fly i::after { right: 1px; transform: scaleX(-1) rotate(18deg); }
-.fallback-fly.active { text-shadow: 0 0 12px var(--accent); transform: scale(1.15); }
-.fallback-fly.seat-0 { left: -8%; top: 25%; }.fallback-fly.seat-1 { left: 17%; top: -12%; }.fallback-fly.seat-2 { right: 17%; top: -12%; }.fallback-fly.seat-3 { right: -8%; top: 25%; }.fallback-fly.seat-4 { right: 3%; bottom: 6%; }.fallback-fly.seat-5 { left: 3%; bottom: 6%; }
-.scene-loading { align-items: center; background: radial-gradient(circle at 50% 45%, #172d22, #090d0b 72%); color: var(--dim); display: flex; font-family: 'JetBrains Mono'; font-size: 10px; height: 100%; inset: 0; justify-content: center; letter-spacing: .12em; overflow: hidden; position: absolute; text-align: center; text-transform: uppercase; }
-.scene-loading::before { background: radial-gradient(ellipse at 50% 44%, #235d45 0, #174633 55%, #102d22 100%); border: 7px solid #5a3c21; border-radius: 50%; box-shadow: 0 0 0 3px #c39444, 0 22px 40px #000b; content: ''; height: 62%; position: absolute; width: 76%; }
-.scene-loading::after { content: 'Lighting the felt…'; position: relative; z-index: 1; }
+.scene-loading { align-items: center; background: #0b0e0c; color: var(--dim); display: flex; font-family: 'JetBrains Mono'; font-size: 10px; height: 100%; inset: 0; justify-content: center; letter-spacing: .12em; position: absolute; text-align: center; text-transform: uppercase; }
 .table-shadow { background: radial-gradient(ellipse at center, rgba(0, 0, 0, .7), transparent 66%); bottom: 12px; height: 180px; left: 8%; position: absolute; right: 8%; z-index: 0; }
 .table-ui { position: absolute; top: 193px; z-index: 3; }
 .table-ui-left { left: -4px; }

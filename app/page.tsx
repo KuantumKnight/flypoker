@@ -10,6 +10,8 @@ const CasinoScene = dynamic(() => import("@/components/CasinoScene"), { ssr: fal
 
 export default function Home() {
   const [offlineReplay, setOfflineReplay] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(false);
+  const [connectionCheck, setConnectionCheck] = useState<ConnectionCheckResult | null>(null);
   const snapshot = useFlyPokerStore((state) => state.snapshot);
   const connected = useFlyPokerStore((state) => state.connected);
   const viewMode = useFlyPokerStore((state) => state.viewMode);
@@ -31,6 +33,61 @@ export default function Home() {
   const decisions = useFlyPokerStore((state) => state.decisions);
   const telemetry = useFlyPokerStore((state) => state.telemetry);
   const selectedFly = useMemo(() => snapshot?.players.find((player) => player.id === selectedFlyId) ?? snapshot?.players[0], [snapshot, selectedFlyId]);
+
+  const testConnection = async () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+    const wsUrl = process.env.NEXT_PUBLIC_LIVE_WS_URL;
+    setCheckingConnection(true);
+
+    if (!apiBase || !wsUrl) {
+      setConnectionCheck({
+        overall: false,
+        checkedAt: new Date().toLocaleTimeString(),
+        api: { ok: false, detail: "NEXT_PUBLIC_API_URL is not configured" },
+        readiness: { ok: false, detail: "Vercel has no live host to probe" },
+        websocket: { ok: false, detail: "NEXT_PUBLIC_LIVE_WS_URL is not configured" },
+      });
+      setCheckingConnection(false);
+      return;
+    }
+
+    const probe = async (url: string) => {
+      const started = performance.now();
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        const body = await response.json().catch(() => null) as { status?: string; mode?: string; gpu?: string; runtimeNote?: string; detail?: { runtimeNote?: string } } | null;
+        return { response, body, latency: Math.round(performance.now() - started) };
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : "Request failed", latency: Math.round(performance.now() - started) };
+      }
+    };
+
+    const [statusResult, readinessResult] = await Promise.all([
+      probe(`${apiBase}/v1/status`),
+      probe(`${apiBase}/health/ready`),
+    ]);
+    const apiOk = Boolean(statusResult.response?.ok);
+    const readinessOk = Boolean(readinessResult.response?.ok);
+    const websocket = await probeLiveSocket(wsUrl);
+    const statusBody = statusResult.body;
+    const readinessBody = readinessResult.body;
+    const apiDetail = statusResult.error
+      ? statusResult.error
+      : `${statusBody?.status ?? "unknown"} · ${statusBody?.gpu ?? "GPU unavailable"} · ${statusResult.latency} ms`;
+    const readinessDetail = readinessResult.error
+      ? readinessResult.error
+      : readinessOk
+        ? `${readinessBody?.mode ?? "flybrain"} ready · ${readinessResult.latency} ms`
+        : `${readinessBody?.detail?.runtimeNote ?? readinessBody?.runtimeNote ?? "readiness gate failed"} · ${readinessResult.latency} ms`;
+    setConnectionCheck({
+      overall: apiOk && readinessOk && websocket.ok,
+      checkedAt: new Date().toLocaleTimeString(),
+      api: { ok: apiOk, detail: apiDetail },
+      readiness: { ok: readinessOk, detail: readinessDetail },
+      websocket,
+    });
+    setCheckingConnection(false);
+  };
 
   useTableAudio(events.length ? events[events.length - 1]?.type : undefined, muted);
 
@@ -139,7 +196,7 @@ export default function Home() {
         <div className="table-ui table-ui-right">
           <div className="pot-card"><span className="signal-kicker">CURRENT POT</span><strong>{live.pot.toLocaleString()} <small>CHIPS</small></strong><span className="mono">BLINDS {live.blinds}</span></div>
         </div>
-      </section> : <OfflineState replay={offlineReplay} />}
+      </section> : <OfflineState replay={offlineReplay} checking={checkingConnection} result={connectionCheck} onTest={testConnection} />}
 
       {!cleanCinema && live && selectedFly && <>
         <section className="player-rail" aria-label="Players">
@@ -161,8 +218,45 @@ export default function Home() {
   );
 }
 
-function OfflineState({ replay }: { replay: boolean }) {
-  return <section className="table-stage offline-stage" aria-live="polite"><div className="offline-card"><span className="panel-kicker">LIVE HOST {replay ? "ASLEEP" : "UNAVAILABLE"}</span><h2>{replay ? "Recorded hand ready." : "No live hand is running."}</h2><p>{replay ? "This view contains only the last persisted FlyBrain/PokerKit event journal." : "The GPU host is offline or has not passed its readiness gate. No synthetic table is shown."}</p>{replay ? <a className="replay-link" href="/replay/latest">OPEN LATEST REPLAY ↗</a> : <span className="mono">WAITING FOR VERIFIED FLYBRAIN EVENTS</span>}</div></section>;
+function OfflineState({ replay, checking, result, onTest }: { replay: boolean; checking: boolean; result: ConnectionCheckResult | null; onTest: () => void }) {
+  return <section className="table-stage offline-stage" aria-live="polite"><div className="offline-card"><span className="panel-kicker">LIVE HOST {replay ? "ASLEEP" : "UNAVAILABLE"}</span><h2>{replay ? "Recorded hand ready." : "No live hand is running."}</h2><p>{replay ? "This view contains only the last persisted FlyBrain/PokerKit event journal." : "The GPU host is offline or has not passed its readiness gate. No synthetic table is shown."}</p>{replay ? <a className="replay-link" href="/replay/latest">OPEN LATEST REPLAY ↗</a> : <span className="mono">WAITING FOR VERIFIED FLYBRAIN EVENTS</span>}<div className="connection-test"><span className="panel-kicker">PUBLIC PATH DIAGNOSTICS</span><button className="connection-test-button" onClick={onTest} disabled={checking}>{checking ? "TESTING API + WEBSOCKET…" : "TEST LIVE CONNECTION"}</button>{result && <div className={`connection-check ${result.overall ? "success" : "failure"}`} role="status"><strong>{result.overall ? "LIVE PATH VERIFIED" : "CONNECTION NOT READY"}</strong><span className="mono">CHECKED {result.checkedAt}</span><div className="connection-check-list"><CheckLine label="API" result={result.api} /><CheckLine label="GPU READINESS" result={result.readiness} /><CheckLine label="WEBSOCKET" result={result.websocket} /></div></div>}</div></div></section>;
+}
+
+type ConnectionCheckLine = { ok: boolean; detail: string };
+type ConnectionCheckResult = { overall: boolean; checkedAt: string; api: ConnectionCheckLine; readiness: ConnectionCheckLine; websocket: ConnectionCheckLine };
+
+function CheckLine({ label, result }: { label: string; result: ConnectionCheckLine }) {
+  return <div className="connection-check-line"><span className={`check-mark ${result.ok ? "ok" : "bad"}`}>{result.ok ? "✓" : "×"}</span><span><b>{label}</b><small>{result.detail}</small></span></div>;
+}
+
+function probeLiveSocket(url: string): Promise<ConnectionCheckLine> {
+  return new Promise((resolve) => {
+    let socket: WebSocket | undefined;
+    let settled = false;
+    const finish = (result: ConnectionCheckLine) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      socket?.close();
+      resolve(result);
+    };
+    const timeout = window.setTimeout(() => finish({ ok: false, detail: "Timed out waiting for a live frame" }), 7000);
+    try {
+      socket = new WebSocket(url);
+      socket.onmessage = (message) => {
+        try {
+          const payload = JSON.parse(message.data) as { snapshot?: unknown; status?: { status?: string } };
+          if (payload.snapshot) finish({ ok: true, detail: "live snapshot received" });
+          else finish({ ok: false, detail: `host reported ${payload.status?.status ?? "offline"}` });
+        } catch {
+          finish({ ok: false, detail: "received an unreadable frame" });
+        }
+      };
+      socket.onerror = () => finish({ ok: false, detail: "WebSocket handshake failed" });
+    } catch (error) {
+      finish({ ok: false, detail: error instanceof Error ? error.message : "WebSocket could not start" });
+    }
+  });
 }
 
 function PortfolioNote({ mode, connected }: { mode: "simulated" | "flybrain"; connected: boolean }) {
@@ -242,14 +336,14 @@ function BroadcastPanel({ snapshot }: { snapshot: TableSnapshot }) {
 }
 
 function InspectionPanel({ player, snapshot, decision, telemetry }: { player: FlyPlayer; snapshot: TableSnapshot; decision?: { features: Record<string, number>; legalActions: string[]; logits: Record<string, number>; sizing?: string }; telemetry?: NeuralTelemetry }) {
-  const features = Object.entries(telemetry?.features ?? decision?.features ?? { LC10a: player.equity, LPLC1: 1 - player.equity * 0.7, LPLC2: player.activity, LC4: Math.min(1, player.activity * 0.8) });
-  const legalActions = decision?.legalActions.length ? decision.legalActions : ["fold", "call", "raise"];
+  const features = Object.entries(telemetry?.features ?? decision?.features ?? {});
+  const legalActions = decision?.legalActions ?? [];
   const logits = Object.entries(decision?.logits ?? {});
-  const activity = telemetry?.activity ?? player.activity;
-  const regions = telemetry?.regions ?? { sensory: player.equity, central: player.activity, drives: 1 - player.equity, motor: activity };
-  const populations = telemetry?.stimulatedPopulations ?? ["LC10a", "LPLC1", "LPLC2", "LC4"];
-  const sampledCount = telemetry?.sampledNeuronCount ?? 12000;
-  return <div className="inspection-panel"><div className="inspection-heading"><div><span className="panel-kicker">INSPECTING / {player.name.toUpperCase()}</span><strong>{player.style}</strong><p className="inspection-stack">STACK {player.chips.toLocaleString()} · EQUITY {Math.round(player.equity * 100)}%</p></div><span className="inspection-live"><span className="live-dot online" /> {telemetry?.mode === "flybrain" ? "MALECNS LIVE" : "LIVE"}</span></div><div className="inspection-grid"><div><span className="data-label">PUBLIC STATISTICS</span><p>VPIP <strong>{Math.round(player.vpip * 100)}%</strong><br />PFR <strong>{Math.round(player.pfr * 100)}%</strong><br />AGGRESSION <strong>{Math.round(player.aggression * 100)}%</strong></p><span className="data-label sub-label">CURRENT TELL</span><p>{player.tell}</p><span className="data-label sub-label">LEGAL ACTION MASK</span><div className="legal-mask">{legalActions.map((action) => <b key={action}>{action.toUpperCase()}</b>)}</div><span className="data-label sub-label">STIMULATED POPULATIONS</span><div className="legal-mask">{populations.map((population) => <b key={population}>{population}</b>)}</div></div><div><span className="data-label">ENCODED FEATURE PULSES</span><div className="activity-bars">{features.map(([label, value]) => <span key={label}><i style={{ width: `${Math.max(18, Number(value) * 100)}%` }} /><b>{label}</b></span>)}</div><span className="data-label sub-label">LIVE CNS SAMPLE / ~{sampledCount.toLocaleString()} POSITIONS</span><BrainSample activity={activity} regions={regions} sampledSpikes={telemetry?.sampledSpikes ?? []} /></div><div><span className="data-label">READOUT TELEMETRY</span><p>Chosen action: <strong>{player.status.toUpperCase()}</strong><br />Sizing: <strong>{decision?.sizing ?? "LEGAL CLAMP"}</strong><br />Logits: <strong>{logits.length ? logits.map(([name, value]) => `${name} ${Number(value).toFixed(2)}`).join(" · ") : "waiting"}</strong><br />Descending view: <strong>~{sampledCount.toLocaleString()} sampled positions</strong></p><span className="model-note">Sampled activity from the {snapshot.mode === "flybrain" ? "MaleCNS" : "development adapter"}; never the full brain matrix.</span></div></div></div>;
+  const activity = telemetry?.activity ?? 0;
+  const regions = telemetry?.regions ?? {};
+  const populations = telemetry?.stimulatedPopulations ?? [];
+  const sampledCount = telemetry?.sampledNeuronCount ?? 0;
+  return <div className="inspection-panel"><div className="inspection-heading"><div><span className="panel-kicker">INSPECTING / {player.name.toUpperCase()}</span><strong>{player.style}</strong><p className="inspection-stack">STACK {player.chips.toLocaleString()} · EQUITY {Math.round(player.equity * 100)}%</p></div><span className="inspection-live"><span className="live-dot online" /> {telemetry?.mode === "flybrain" ? "MALECNS LIVE" : "WAITING"}</span></div><div className="inspection-grid"><div><span className="data-label">PUBLIC STATISTICS</span><p>VPIP <strong>{Math.round(player.vpip * 100)}%</strong><br />PFR <strong>{Math.round(player.pfr * 100)}%</strong><br />AGGRESSION <strong>{Math.round(player.aggression * 100)}%</strong></p><span className="data-label sub-label">CURRENT TELL</span><p>{player.tell}</p><span className="data-label sub-label">LEGAL ACTION MASK</span><div className="legal-mask">{legalActions.length ? legalActions.map((action) => <b key={action}>{action.toUpperCase()}</b>) : <span className="mono">WAITING FOR DECISION FRAME</span>}</div><span className="data-label sub-label">STIMULATED POPULATIONS</span><div className="legal-mask">{populations.length ? populations.map((population) => <b key={population}>{population}</b>) : <span className="mono">WAITING FOR NEURAL FRAME</span>}</div></div><div><span className="data-label">ENCODED FEATURE PULSES</span><div className="activity-bars">{features.length ? features.map(([label, value]) => <span key={label}><i style={{ width: `${Math.max(18, Number(value) * 100)}%` }} /><b>{label}</b></span>) : <span className="mono">WAITING FOR VERIFIED ENCODER OUTPUT</span>}</div><span className="data-label sub-label">LIVE CNS SAMPLE {sampledCount ? `/ ~${sampledCount.toLocaleString()} POSITIONS` : ""}</span>{telemetry ? <BrainSample activity={activity} regions={regions} sampledSpikes={telemetry.sampledSpikes} /> : <div className="brain-map-empty">Waiting for the first FlyBrain telemetry frame.</div>}</div><div><span className="data-label">READOUT TELEMETRY</span><p>Chosen action: <strong>{player.status.toUpperCase()}</strong><br />Sizing: <strong>{decision?.sizing ?? "waiting"}</strong><br />Logits: <strong>{logits.length ? logits.map(([name, value]) => `${name} ${Number(value).toFixed(2)}`).join(" · ") : "waiting"}</strong><br />Descending view: <strong>{sampledCount ? `~${sampledCount.toLocaleString()} sampled positions` : "waiting"}</strong></p><span className="model-note">{telemetry ? "Sampled activity from the MaleCNS; never the full brain matrix." : "No synthetic activity is shown before the live telemetry frame arrives."}</span></div></div></div>;
 }
 
 function BrainSample({ activity, regions, sampledSpikes }: { activity: number; regions: Record<string, number>; sampledSpikes: number[] }) {
